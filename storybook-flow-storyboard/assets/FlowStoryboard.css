@@ -1,0 +1,237 @@
+/* 【交付導覽】流程走查看板。不是產品介面,是給 PM／工程看流程、貼便利貼用的,
+   所以不套 375 手機框;每一格裡面才是真的 375×812 畫面,用 transform 縮小。
+   整塊看板寬度由內容決定(不在自己裡面捲動),便利貼以整塊看板為基準記比例才不會跑掉。 */
+
+.ds-flow-storyboard {
+  --flow-scale: 0.56;
+  --flow-frame-width: calc(375px * var(--flow-scale));
+  --flow-frame-height: calc(812px * var(--flow-scale));
+  --flow-head-height: 60px;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100vh;
+  padding: 24px 24px 48px;
+  background: var(--ds-sys-color-surface-sunken);
+  color: var(--ds-sys-color-text-primary);
+  font-family: var(--ds-ref-font-family-base);
+}
+
+.ds-flow-storyboard__header {
+  max-width: 880px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ds-sys-color-border-subtle);
+}
+
+.ds-flow-storyboard__title {
+  margin: 0 0 8px;
+  font-size: var(--ds-sys-typography-heading-l-bold-size);
+  font-weight: var(--ds-sys-typography-heading-l-bold-weight);
+  line-height: var(--ds-sys-typography-heading-l-bold-line-height);
+}
+
+.ds-flow-storyboard__summary {
+  margin: 0;
+  color: var(--ds-sys-color-text-secondary);
+  font-size: var(--ds-sys-typography-body-l-size);
+  line-height: var(--ds-sys-typography-body-l-line-height);
+}
+
+.ds-flow-storyboard__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  color: var(--ds-sys-color-text-tertiary);
+  font-size: var(--ds-sys-typography-body-small-size);
+  line-height: var(--ds-sys-typography-body-small-line-height);
+}
+
+.ds-flow-storyboard__legend-item--solid::before,
+.ds-flow-storyboard__legend-item--dashed::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border: 1.5px solid var(--ds-sys-color-text-tertiary);
+  border-radius: 3px;
+}
+
+.ds-flow-storyboard__legend-item--dashed::before {
+  border-style: dashed;
+}
+
+/* 一列＝流程的一段。列標題在上,步驟橫著排。 */
+.ds-flow-storyboard__row {
+  margin-bottom: 32px;
+}
+
+.ds-flow-storyboard__row-label {
+  margin: 0 0 12px;
+  color: var(--ds-sys-color-text-secondary);
+  font-size: var(--ds-sys-typography-body-l-bold-size);
+  font-weight: var(--ds-sys-typography-body-l-bold-weight);
+  line-height: var(--ds-sys-typography-body-l-bold-line-height);
+}
+
+.ds-flow-storyboard__steps {
+  display: flex;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-flow-storyboard__step {
+  flex: none;
+  width: var(--flow-frame-width);
+}
+
+.ds-flow-storyboard__step-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+}
+
+.ds-flow-storyboard__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ds-sys-color-text-primary);
+  color: var(--ds-sys-color-surface);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ds-flow-storyboard__actor {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ds-flow-storyboard__actor--me {
+  background: var(--ds-sys-color-brand-green-subtle);
+  color: var(--ds-sys-color-brand-green-strong);
+}
+
+.ds-flow-storyboard__actor--other {
+  background: var(--ds-sys-color-warning-subtle, #fff4e5);
+  color: var(--ds-sys-color-warning-strong, #b45309);
+}
+
+.ds-flow-storyboard__actor--system,
+.ds-flow-storyboard__actor--external {
+  background: var(--ds-sys-color-surface-sunken);
+  color: var(--ds-sys-color-text-secondary);
+  border: 1px dashed var(--ds-sys-color-border-subtle);
+}
+
+.ds-flow-storyboard__step-title {
+  height: 36px;
+  margin: 4px 0 8px;
+  overflow: hidden;
+  font-size: var(--ds-sys-typography-body-medium-bold-size);
+  font-weight: var(--ds-sys-typography-body-medium-bold-weight);
+  line-height: 18px;
+}
+
+/* 手機畫面外框:固定 375×812 縮小後的尺寸,超出裁掉。
+   裡面的畫面被 transform 縮小,所以畫面內任何 position: fixed 的疊層(彈窗、掃描、相機)
+   都會被這個框收住,不會跑到整頁去。 */
+.ds-flow-storyboard__frame {
+  position: relative;
+  width: var(--flow-frame-width);
+  height: var(--flow-frame-height);
+  overflow: hidden;
+  border: 1px solid var(--ds-sys-color-border-subtle);
+  border-radius: 12px;
+  background: var(--ds-sys-color-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.ds-flow-storyboard__frame--dashed {
+  border: 2px dashed var(--ds-sys-color-text-disabled);
+}
+
+.ds-flow-storyboard__screen {
+  position: relative;
+  width: 375px;
+  height: 812px;
+  transform: scale(var(--flow-scale));
+  transform-origin: top left;
+  /* 看板上的畫面不能操作。 */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 便利貼「新增」模式(便利貼 addon 會在 body 掛 tn-arming):暫時打開點擊,
+   讓便利貼撿得到「點了哪顆按鈕」當觸發行為;點擊本身會被便利貼在 capture 階段攔掉,不會真的觸發。 */
+.tn-arming .ds-flow-storyboard__screen {
+  pointer-events: auto;
+}
+
+.ds-flow-storyboard__step-note {
+  width: var(--flow-frame-width);
+  margin: 8px 0 0;
+  color: var(--ds-sys-color-text-secondary);
+  font-size: var(--ds-sys-typography-body-small-size);
+  line-height: var(--ds-sys-typography-body-small-line-height);
+}
+
+/* 兩格之間:操作說明在上、箭頭在下,對齊手機畫面的垂直中線。 */
+.ds-flow-storyboard__connector {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 104px;
+  height: var(--flow-frame-height);
+  margin-top: var(--flow-head-height);
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.ds-flow-storyboard__action {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ds-sys-color-brand-green-subtle);
+  color: var(--ds-sys-color-brand-green-strong);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  word-break: break-word;
+}
+
+.ds-flow-storyboard__arrow {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: var(--ds-sys-color-text-disabled);
+}
+
+.ds-flow-storyboard__arrow::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -1px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid var(--ds-sys-color-text-disabled);
+}
