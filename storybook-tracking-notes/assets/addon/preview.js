@@ -24,8 +24,8 @@ const ANCHOR_SELECTORS = [".ds-storybook-mobile-preview-frame", "#storybook-root
 const CAPTURE_MAX_SIDE = 720;
 
 const KINDS = [
-  { id: "existing", label: "既有埋點", hint: "沿用埋點表已經有的事件,從清單挑一個。" },
-  { id: "new", label: "新埋點", hint: "這次要新增的事件。名稱可以留空,交給 Claude 依命名規範命名。" },
+  { id: "existing", label: "既有埋點", hint: "事件清單裡已經有的事件(含別的功能先登記、還沒進 PM 表的),從清單挑一個,沿用原名。" },
+  { id: "new", label: "新埋點", hint: "清單裡還沒有的事件。存檔後會自動登記進事件清單,之後別的功能就當既有埋點挑。名稱可以留空,交給 Claude 依命名規範命名。" },
   { id: "interaction", label: "互動說明", hint: "說明這裡怎麼互動、會發生什麼。" },
   { id: "info", label: "補充資訊", hint: "其他要給工程或 Claude 的補充。" },
 ];
@@ -66,7 +66,9 @@ function findBoard() {
   if (!element) return null;
   const id = element.getAttribute("data-flow-board") ?? "";
   const title = (element.querySelector(".ds-flow-storyboard__title")?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
-  return id ? { id, title } : null;
+  /* 看板可以自己說它屬於哪一則 story（全 App 流程圖用 data-flow-board-story-title），沒寫就是好友功能的流程走查 */
+  const storyTitle = element.getAttribute("data-flow-board-story-title") ?? "好友功能/流程走查";
+  return id ? { id, title, storyTitle } : null;
 }
 
 function stepFrameSelector(boardId, stepId) {
@@ -204,7 +206,7 @@ function TrackingNotes({ context }) {
   const { rect, board, stepRects } = useAnchorRects(visible);
   /* 畫面上是流程走查看板時,便利貼跟那條流程存,不跟目前的 story 存。 */
   const story = useMemo(
-    () => (board ? { id: `flow-${board.id}`, title: "好友功能/流程走查", name: board.title } : currentStory),
+    () => (board ? { id: `flow-${board.id}`, title: board.storyTitle, name: board.title } : currentStory),
     [board, currentStory],
   );
   /* 哪一張便利貼用哪個基準框:貼在某一步的用那一步的手機畫面框;那一步已經不存在就先不畫。 */
@@ -346,7 +348,16 @@ function TrackingNotes({ context }) {
 
   const saveDraft = useCallback(async () => {
     if (!draft || busy) return;
-    const { fields } = draft;
+    let { fields } = draft;
+    /* 「新埋點」填的名字其實已經在清單裡 → 自動改成既有埋點,免得同一個事件被兩個功能各自當新的 */
+    if (fields.kind === "new" && fields.eventName.trim()) {
+      const list = await loadEvents();
+      const hit = list.find((event) => event.name.toLowerCase() === fields.eventName.trim().toLowerCase());
+      if (hit) {
+        fields = { ...fields, kind: "existing", eventName: hit.name };
+        showToast(`「${hit.name}」已經在事件清單裡,已改成既有埋點。`);
+      }
+    }
     const needsTrigger = fields.kind === "existing" || fields.kind === "new";
     if (needsTrigger && !fields.trigger.trim()) return showToast("請填「觸發行為」。");
     if (fields.kind === "existing" && !fields.eventName.trim()) return showToast("請從清單選一個既有事件。");
@@ -655,6 +666,10 @@ function Composer({ busy, draft, events, onCancel, onChange, onSave, ordinal, re
     return pool.slice(0, 8);
   }, [events, query]);
   const selected = events.find((event) => event.name === fields.eventName);
+  const duplicate =
+    fields.kind === "new" && fields.eventName.trim()
+      ? events.find((event) => event.name.toLowerCase() === fields.eventName.trim().toLowerCase())
+      : null;
 
   const field = (label, control, hint) =>
     h("label", { className: "tn-field" }, h("span", { className: "tn-field__label" }, label), control, hint && h("span", { className: "tn-field__hint" }, hint));
@@ -754,12 +769,13 @@ function Composer({ busy, draft, events, onCancel, onChange, onSave, ordinal, re
                     },
                     h("code", null, event.name),
                     h("span", null, event.description),
+                    event.pending && h("em", { className: "tn-picker__pending", title: `由便利貼登記(${event.addedFrom || ""}),還沒進 PM 埋點表` }, "待進 PM 表"),
                   ),
                 ),
               ),
           ),
           selected
-            ? h("span", { className: "tn-field__hint" }, `埋點表:${selected.description}${selected.params ? `;參數 ${selected.params}` : ""}`)
+            ? h("span", { className: "tn-field__hint" }, `${selected.pending ? "便利貼登記(待 PM 進表)" : "埋點表"}:${selected.description}${selected.params ? `;參數 ${selected.params}` : ""}`)
             : h("span", { className: "tn-field__hint" }, "找不到?可能是新的行為,切到「新埋點」。"),
         ),
       fields.kind === "new" &&
@@ -771,7 +787,9 @@ function Composer({ busy, draft, events, onCancel, onChange, onSave, ordinal, re
             placeholder: "留空 → 由 Claude 依命名規範命名",
             value: fields.eventName,
           }),
-          "規範:前綴_名稱_動作,例 SWG_InvitePopup_showed——前綴 3 個大寫字母(頁面／功能)、名稱每個詞首字大寫、動作小寫過去式(clicked／entered／showed／closed)。",
+          duplicate
+            ? `⚠ 「${duplicate.name}」已經在事件清單裡(${duplicate.module || "—"};${duplicate.pending ? "由別的便利貼登記、還沒進 PM 表" : "PM 埋點表"})。存檔時會自動改成「既有埋點」。`
+            : "規範:前綴_名稱_動作,例 SWG_InvitePopup_showed——前綴 3 個大寫字母(頁面／功能)、名稱每個詞首字大寫、動作小寫過去式(clicked／entered／showed／closed)。",
         ),
       isEvent &&
         field(

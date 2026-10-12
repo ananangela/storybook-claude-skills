@@ -9,6 +9,7 @@
 //   design-system/tracking-notes/<storyId>.json   每個 story 一份,便利貼本體
 //   design-system/tracking-notes/captures/*.webp  貼便利貼當下的畫面截圖
 //   design-system/tracking-notes/INDEX.md         自動彙整的總表,給 PM／工程／Claude 讀
+//   design-system/tracking-events/invoice-manager.json  事件清單;便利貼的新埋點會自動登記進來(pending＝還沒進 PM 表)
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -16,6 +17,8 @@ import { join, resolve } from "node:path";
 
 export const defaultTrackingNotesApiPath = "/__tracking_notes";
 export const defaultTrackingNotesDir = "design-system/tracking-notes";
+/** 事件清單(「既有埋點」下拉選單的來源;便利貼的新埋點會自動登記進來)。 */
+export const defaultTrackingEventsFile = "design-system/tracking-events/invoice-manager.json";
 
 export const TRACKING_NOTE_KINDS = ["existing", "new", "interaction", "info"];
 export const TRACKING_NOTE_KIND_LABELS = {
@@ -126,8 +129,81 @@ function cell(value) {
   return String(value ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>") || "—";
 }
 
-/** 重新產生 INDEX.md:一個 story 一節,每張便利貼一列。 */
-export async function regenerateTrackingNotesIndex(dir) {
+function eventPrefix(name) {
+  const match = /^([A-Za-z0-9]+)_/.exec(name);
+  return match ? match[1] : "";
+}
+
+/**
+ * 便利貼裡有名字的「新埋點」自動登記進事件清單——之後任何功能貼便利貼時,
+ * 下拉選單就挑得到它(當「既有埋點」),不用等 PM 把埋點表更新。
+ *   - 清單裡已有同名的(不管來源)→ 不動。
+ *   - 新登記的標 `pending: true`(＝還沒進 PM 的埋點表),`source` 記是哪張便利貼;
+ *     之後從 PM 埋點表匯入時同名會被匯入的覆蓋,pending 自然消失。
+ *   - 來源是便利貼、但那張便利貼已刪或改名 → 從清單移除(清單裡只留現況)。
+ * 回傳 { added, removed, pending }(都是事件名陣列)。
+ */
+export async function syncTrackingEventsFromNotes(notesDir, eventsFile) {
+  const data = await readJson(eventsFile, null);
+  if (!data || !Array.isArray(data.events)) return { added: [], removed: [], pending: [] };
+  const entries = (await readdir(notesDir).catch(() => [])).filter((name) => name.endsWith(".json")).sort();
+  const fromNotes = new Map();
+  for (const fileName of entries) {
+    const file = await readJson(join(notesDir, fileName), null);
+    if (!file || !Array.isArray(file.notes)) continue;
+    const storyTitle = String(file.story?.title ?? "");
+    const parts = storyTitle.split("/").map((part) => part.trim()).filter(Boolean);
+    const group = parts.length > 1 ? parts[1] : parts[0] ?? "";
+    for (const note of file.notes) {
+      if (note.kind !== "new" || typeof note.eventName !== "string") continue;
+      const name = note.eventName.trim();
+      if (!name || fromNotes.has(name)) continue;
+      fromNotes.set(name, {
+        name,
+        description: note.trigger || note.note || "",
+        params: note.params || "",
+        module: group || eventPrefix(name),
+        source: `note:${fileName}#${note.id}`,
+        pending: true,
+        noteStatus: note.status ?? "open",
+        addedFrom: storyTitle,
+        addedAt: String(note.updatedAt || note.createdAt || "").slice(0, 10),
+      });
+    }
+  }
+  const byName = new Map(data.events.map((event) => [event.name, event]));
+  const added = [];
+  const removed = [];
+  for (const [name, entry] of fromNotes) {
+    const current = byName.get(name);
+    if (!current) {
+      byName.set(name, entry);
+      added.push(name);
+    } else if (typeof current.source === "string" && current.source.startsWith("note:")) {
+      byName.set(name, { ...current, ...entry, source: current.source });
+    }
+  }
+  for (const [name, event] of byName) {
+    if (typeof event.source === "string" && event.source.startsWith("note:") && !fromNotes.has(name)) {
+      byName.delete(name);
+      removed.push(name);
+    }
+  }
+  const events = [...byName.values()];
+  const pending = events.filter((event) => event.pending).map((event) => event.name);
+  if (JSON.stringify(events) !== JSON.stringify(data.events)) {
+    data.events = events;
+    data.updatedAt = new Date().toISOString().slice(0, 10);
+    await writeFile(eventsFile, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  }
+  return { added, removed, pending };
+}
+
+/** 重新產生 INDEX.md:一個 story 一節,每張便利貼一列。給 eventsFile 會順便標每個事件在事件清單裡的狀態。 */
+export async function regenerateTrackingNotesIndex(dir, eventsFile = null) {
+  const eventList = eventsFile ? (await readJson(eventsFile, null))?.events ?? [] : [];
+  const eventByName = new Map((Array.isArray(eventList) ? eventList : []).map((event) => [event.name, event]));
+  const pendingCount = [...eventByName.values()].filter((event) => event.pending).length;
   await mkdir(dir, { recursive: true });
   const entries = (await readdir(dir)).filter((name) => name.endsWith(".json")).sort();
   const files = [];
@@ -155,8 +231,10 @@ export async function regenerateTrackingNotesIndex(dir) {
     "",
     `- 便利貼總數:${total}(已確認 ${confirmed},待確認 ${total - confirmed})`,
     `- 最後更新:${new Date().toLocaleString("sv-SE").slice(0, 16)}`,
+    ...(eventsFile ? [`- 新埋點已自動登記進事件清單、還沒進 PM 埋點表的:${pendingCount} 筆(事件清單裡 \`pending: true\` 的那些)`] : []),
     "",
-    "類型說明:**既有埋點** ＝ 沿用埋點表已有的事件;**新埋點** ＝ 這次要新增的事件(事件名稱空白代表交給 Claude 依命名規範命名);**互動說明** ＝ 說明這裡怎麼互動;**補充資訊** ＝ 其他要給工程的話。",
+    "類型說明:**既有埋點** ＝ 事件清單(tracking-events)裡已經有的事件,沿用原名;**新埋點** ＝ 貼的當下清單裡還沒有的事件,存檔後自動登記進清單,之後別的功能就當既有埋點挑(事件名稱空白代表交給 Claude 依命名規範命名);**互動說明** ＝ 說明這裡怎麼互動;**補充資訊** ＝ 其他要給工程的話。",
+    "判斷基準是**全 App 一份事件清單**,不是某個功能:A 功能第一次用到＝新埋點(A 的交付負責實作、PM 進表),B 功能再用到＝既有埋點(只是多一個觸發點)。",
     "",
   ];
 
@@ -169,8 +247,18 @@ export async function regenerateTrackingNotesIndex(dir) {
     lines.push("| # | 類型 | 畫面 | 點的位置 | 觸發行為 | 事件名稱 | 參數 | 補充 | 作者 | 日期 | 狀態 | 截圖 |");
     lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");
     data.notes.forEach((note, index) => {
+      const listed = note.eventName ? eventByName.get(String(note.eventName).trim()) : null;
+      const listState = !note.eventName || !eventsFile
+        ? ""
+        : !listed
+          ? "<br>(不在事件清單)"
+          : listed.pending
+            ? "<br>(已登記事件清單,待 PM 進表)"
+            : note.kind === "new"
+              ? "<br>(已在 PM 埋點表)"
+              : "";
       const eventName = note.eventName
-        ? `\`${note.eventName}\``
+        ? `\`${note.eventName}\`${listState}`
         : note.kind === "new"
           ? "(待 Claude 命名)"
           : "—";
@@ -213,8 +301,9 @@ async function readBody(request) {
   }
 }
 
-export function createTrackingNotesStore({ cwd = process.cwd(), dir = defaultTrackingNotesDir } = {}) {
+export function createTrackingNotesStore({ cwd = process.cwd(), dir = defaultTrackingNotesDir, eventsFile = defaultTrackingEventsFile } = {}) {
   const root = resolve(cwd, dir);
+  const eventsPath = eventsFile ? resolve(cwd, eventsFile) : null;
 
   async function loadStory(storyId) {
     const stem = storyFileStem(storyId);
@@ -227,7 +316,8 @@ export function createTrackingNotesStore({ cwd = process.cwd(), dir = defaultTra
   async function persist(path, data) {
     await mkdir(root, { recursive: true });
     await writeFile(path, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-    await regenerateTrackingNotesIndex(root);
+    if (eventsPath) await syncTrackingEventsFromNotes(root, eventsPath).catch(() => {});
+    await regenerateTrackingNotesIndex(root, eventsPath);
   }
 
   return {
@@ -301,7 +391,7 @@ export function createTrackingNotesStore({ cwd = process.cwd(), dir = defaultTra
 /** Vite plugin:掛在 main.ts 的 viteFinal。 */
 export function createTrackingNotesPlugin(options = {}) {
   const apiPath = options.apiPath ?? defaultTrackingNotesApiPath;
-  const store = createTrackingNotesStore({ cwd: options.cwd, dir: options.dir });
+  const store = createTrackingNotesStore({ cwd: options.cwd, dir: options.dir, eventsFile: options.eventsFile });
 
   async function handle(request, response) {
     const url = new URL(request.url ?? "/", "http://storybook.local");

@@ -31,7 +31,7 @@ description: >-
 
 | 欄位 | 意思 |
 |---|---|
-| `kind` | `existing` 既有埋點／`new` 新埋點／`interaction` 互動說明／`info` 補充資訊 |
+| `kind` | `existing` 既有埋點（事件清單裡已有，沿用原名）／`new` 新埋點（貼的當下清單裡沒有；存檔後自動登記進事件清單並標 `pending`，之後別的功能就當既有埋點挑）／`interaction` 互動說明／`info` 補充資訊。基準是全 App 一份事件清單，不是某個功能 |
 | `trigger` | 觸發行為，例：點「加好友」 |
 | `eventName` | 事件名。既有埋點從 `design-system/tracking-events/<app>.json` 挑；新埋點可留空 ＝ 交給 Claude 依該專案的命名規則命名 |
 | `params` | 參數，例：`from＝friendPage／notification` |
@@ -49,6 +49,7 @@ description: >-
 1. 先讀 `INDEX.md` 拿全貌，再依需要開個別 JSON 與截圖。
 2. `kind: new` 且 `eventName` 空白：依**該專案**的命名規則提名字（規則檔在 `design-system/tracking-events/README.md`，範例見 `references/naming-rule-example.md`；不同 App 規則不同，不要套別的專案的），回填到便利貼：用 `PATCH /__tracking_notes/notes/<storyId>/<noteId>`，或直接改 JSON 再跑 `scripts/rebuild_index.mjs`。
 3. `kind: existing` 一律沿用，不改名。
+4. 有名字的新埋點會由 server 自動登記進事件清單（`syncTrackingEventsFromNotes`）；「新埋點」填了清單裡已有的名字會在存檔時自動改成既有埋點。PM 的上游表更新後重新匯入，同名覆蓋、`pending` 消失。手動同步：`node scripts/sync-tracking-events.mjs`（複本在本 skill 的 `scripts/`）。
 4. `status: open` 是 PM 還沒拍板的，寫進文件時標「待確認」。
 5. 寫進交付文件（FLOW_SPEC 轉場表埋點欄、PRODUCTION_HANDOFF 埋點節）由 `storybook-tracking-handoff` 接手。
 6. commit 時只加便利貼相關路徑（`design-system/tracking-notes/`、`tracking-events/`），不混進別的工作。檔名含中文要先 `git config core.quotePath false`。

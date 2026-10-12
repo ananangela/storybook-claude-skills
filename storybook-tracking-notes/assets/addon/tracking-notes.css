@@ -452,3 +452,6 @@ body.tn-arming * {
 @media (prefers-reduced-motion: reduce) {
   .tn-pin, .tn-pin--draft { transition: none; animation: none; }
 }
+
+/* 事件清單裡由便利貼登記、還沒進 PM 表的事件 */
+.tn-picker__pending { margin-left: auto; flex: none; padding: 0 5px; border-radius: 4px; background: #fef3c7; color: #92400e; font-size: 10px; font-style: normal; line-height: 16px; }
