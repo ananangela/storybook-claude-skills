@@ -350,12 +350,16 @@ function TrackingNotes({ context }) {
     if (!draft || busy) return;
     let { fields } = draft;
     /* 「新埋點」填的名字其實已經在清單裡 → 自動改成既有埋點,免得同一個事件被兩個功能各自當新的 */
-    if (fields.kind === "new" && fields.eventName.trim()) {
+    if ((fields.kind === "new" || fields.kind === "existing") && fields.eventName.trim()) {
       const list = await loadEvents();
       const hit = list.find((event) => event.name.toLowerCase() === fields.eventName.trim().toLowerCase());
-      if (hit) {
+      if (fields.kind === "new" && hit) {
         fields = { ...fields, kind: "existing", eventName: hit.name };
         showToast(`「${hit.name}」已經在事件清單裡,已改成既有埋點。`);
+      } else if (fields.kind === "existing" && !hit && list.length > 0) {
+        /* 「既有埋點」手打了清單裡沒有的名字 → 其實是新的,改成新埋點(存檔後會自動登記進清單) */
+        fields = { ...fields, kind: "new" };
+        showToast(`「${fields.eventName.trim()}」不在事件清單裡,已改成新埋點並登記。`);
       }
     }
     const needsTrigger = fields.kind === "existing" || fields.kind === "new";
