@@ -202,7 +202,9 @@ function TrackingNotes({ context }) {
     () => ({ id: context.id, title: context.title ?? "", name: context.name ?? "" }),
     [context.id, context.title, context.name],
   );
-  const visible = context.globals?.[GLOBAL_NAME] !== "hide";
+  /* 工具列切到 Prototype 檢視器的其他模式(UI Flow 是嵌進來的全 App 流程圖,它自己有一套便利貼)時,這一層不顯示 */
+  const inspectorMode = context.globals?.prototypeMode;
+  const visible = context.globals?.[GLOBAL_NAME] !== "hide" && (!inspectorMode || inspectorMode === "story");
   const { rect, board, stepRects } = useAnchorRects(visible);
   /* 畫面上是流程走查看板時,便利貼跟那條流程存,不跟目前的 story 存。 */
   const story = useMemo(
