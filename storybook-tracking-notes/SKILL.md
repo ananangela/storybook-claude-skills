@@ -14,8 +14,10 @@ description: >-
 - 流程走查（一步一格的看板）：`design-system/tracking-notes/flow-<流程代號>.json`，一條流程一份，不管從哪個入口進去貼的都存同一份
 - 截圖：`captures/<noteId>.webp`
 - 總表：`INDEX.md`，每次存檔自動重產。**Claude 要看全部便利貼先讀這份。**
+- 全 App 流程圖（總覽／UI Flow，2026-10-13 起也是工具列「UI Flow」看到的那張）也是一個便利貼看板：`data-flow-board="overall"`，每張頁面卡、狀態卡都是一步；在上面貼的存 `flow-overall.json`。流程走查上貼過的便利貼會搬到對應的卡上顯示（唯讀，點綠色圓點看內容；縮圖裡沒有那個狀態的畫成空心、位置概略）。
+- 事件清單 `design-system/tracking-events/<app>.json`：「既有埋點」下拉的來源；有名字的新埋點存檔時**自動登記**進來（`pending: true`＝還沒進 PM 表）。
 
-只有設計師電腦上跑的 `storybook dev` 能寫（伺服器端在 `server.mjs`）；同一個網址進來的所有人都能看、能加。`storybook build` 的靜態版唯讀。工具列有「便利貼」按鈕可整頁隱藏。
+只有設計師電腦上跑的 `storybook dev` 能寫（伺服器端在 `server.mjs`）；同一個網址進來的所有人都能看、能加。`storybook build` 的靜態版唯讀。工具列有「便利貼」按鈕可整頁隱藏；工具列切到 Prototype 檢視器的其他模式（UI Flow／Docs／Components／Data）時，外層的便利貼不顯示（UI Flow 嵌進來的流程圖有自己的一組）。
 
 ## 什麼時候用這個 Skill
 
@@ -49,10 +51,10 @@ description: >-
 1. 先讀 `INDEX.md` 拿全貌，再依需要開個別 JSON 與截圖。
 2. `kind: new` 且 `eventName` 空白：依**該專案**的命名規則提名字（規則檔在 `design-system/tracking-events/README.md`，範例見 `references/naming-rule-example.md`；不同 App 規則不同，不要套別的專案的），回填到便利貼：用 `PATCH /__tracking_notes/notes/<storyId>/<noteId>`，或直接改 JSON 再跑 `scripts/rebuild_index.mjs`。
 3. `kind: existing` 一律沿用，不改名。
-4. 有名字的新埋點會由 server 自動登記進事件清單（`syncTrackingEventsFromNotes`）；「新埋點」填了清單裡已有的名字會在存檔時自動改成既有埋點。PM 的上游表更新後重新匯入，同名覆蓋、`pending` 消失。手動同步：`node scripts/sync-tracking-events.mjs`（複本在本 skill 的 `scripts/`）。
-4. `status: open` 是 PM 還沒拍板的，寫進文件時標「待確認」。
-5. 寫進交付文件（FLOW_SPEC 轉場表埋點欄、PRODUCTION_HANDOFF 埋點節）由 `storybook-tracking-handoff` 接手。
-6. commit 時只加便利貼相關路徑（`design-system/tracking-notes/`、`tracking-events/`），不混進別的工作。檔名含中文要先 `git config core.quotePath false`。
+4. 有名字的新埋點會由 server 自動登記進事件清單（`syncTrackingEventsFromNotes`）；「新埋點」填了清單裡已有的名字會在存檔時自動改成既有埋點，「既有埋點」手打了清單裡沒有的名字會自動改成新埋點。PM 的上游表更新後重新匯入，同名覆蓋、`pending` 消失。手動同步：`node scripts/sync-tracking-events.mjs`（複本在本 skill 的 `scripts/`）。「既有／新」的基準是**全 App 一份事件清單**，不是某個功能：A 功能第一次用到＝新（A 的交付負責實作、PM 進表），B 功能再用到＝既有；便利貼記的是貼的當下，不回頭改，INDEX 會補標現況。
+5. `status: open` 是 PM 還沒拍板的，寫進文件時標「待確認」。
+6. 寫進交付文件（FLOW_SPEC 轉場表埋點欄、PRODUCTION_HANDOFF 埋點節）由 `storybook-tracking-handoff` 接手。
+7. commit 時只加便利貼相關路徑（`design-system/tracking-notes/`、`tracking-events/`），不混進別的工作。檔名含中文要先 `git config core.quotePath false`。
 
 ## 安裝到另一個 Storybook 專案
 
@@ -65,7 +67,8 @@ description: >-
    - `staticDirs` 要包含 `../design-system`，靜態版才讀得到 JSON
 3. 改 `preview.js` 開頭兩個常數：`EVENTS_URL` 指向該專案的既有埋點清單（`/tracking-events/<app>.json`）；`ANCHOR_SELECTORS` 第一個換成該專案手機預覽外框的 class。
 4. 建 `design-system/tracking-notes/`，把 `assets/README.template.md` 複製進去當 README，把專案名稱、流程代號檔案位置改掉。
-5. 既有埋點清單：`design-system/tracking-events/<app>.json`，格式 `{ events: [ { eventName, module, description, params, source } ] }`；可用 `POST /__tracking_notes/import-events` 匯入 TSV，或直接寫檔。沒有清單也能用，只是「既有埋點」下拉會是空的。
+5. 事件清單：`design-system/tracking-events/<app>.json`，格式 `{ events: [ { name, description, params, module, source } ] }`；可用 `POST /__tracking_notes/import-events` 匯入 TSV，或直接寫檔。沒有清單也能用，只是「既有埋點」下拉會是空的。路徑不是預設的 `invoice-manager.json` 時，`createTrackingNotesPlugin({ eventsFile: "design-system/tracking-events/<app>.json" })`。
+5b. 把本 skill `scripts/sync-tracking-events.mjs` 複製到專案的 `scripts/`（它 import `../.storybook/tracking-notes/server.mjs`）；封存／交付前跑一次，會列出還沒進 PM 表的事件。
 6. 相依套件：`html-to-image`（截圖）、`@storybook/icons`。
 7. 啟動後確認：畫面右下角有「＋ 新增便利貼」，工具列有「便利貼」按鈕，`GET /__tracking_notes/status` 回 200。
 
@@ -85,3 +88,8 @@ description: >-
 - 不替 PM 決定要埋什麼；沒名字的新埋點才由 Claude 命名，且要回填讓 PM 看得到。
 - 靜態版唯讀；PM 從區網貼的便利貼檔案落在設計師電腦，要由設計師 commit。
 - 位置是相對比例，畫面改版太大時便利貼可能偏掉，以 `target` 文字與截圖為準。
+
+## 版本紀錄
+
+- 2026-10-13：全 App 流程圖（UI Flow）當便利貼看板；工具列檢視器其他模式時外層便利貼不顯示；新埋點自動登記進事件清單（pending）、重複名字雙向自動修正、下拉標「待進 PM 表」、INDEX 補標現況；`scripts/sync-tracking-events.mjs`。
+- 2026-10-07：全域 skill 建立；`retitle_notes.py`、`rebuild_index.mjs`；addon 支援 `data-flow-board-story-title`。
