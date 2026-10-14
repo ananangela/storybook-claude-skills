@@ -180,7 +180,7 @@ export async function syncTrackingEventsFromNotes(notesDir, eventsFile) {
       byName.set(name, entry);
       added.push(name);
     } else if (typeof current.source === "string" && current.source.startsWith("note:")) {
-      byName.set(name, { ...current, ...entry, source: current.source });
+      byName.set(name, { ...current, ...entry });
     }
   }
   for (const [name, event] of byName) {

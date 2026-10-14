@@ -4,8 +4,8 @@
 // 用法：node scripts/export-tracking-notes.mjs <交付資料夾> [--check]
 //   --check：不寫檔，只比對現有快照是否過期（交付前檢查用；過期回傳 1）
 // 交付資料夾的 handoff-preflight.json 要有：
-//   "trackingNotes": { "match": ["好友功能", "^Pages/(好友頁|個人頁)"], "output": "docs/TRACKING_NOTES.md" }
-//   match＝比對便利貼檔 story.title 的正則（任一符合就算這次的）；output 省略＝docs/TRACKING_NOTES.md
+//   "trackingNotes": { "match": ["好友功能", "^Pages/(好友頁|個人頁)"], "cards": ["^friends:"], "output": "docs/TRACKING_NOTES.md" }
+//   match＝比對便利貼檔 story.title 的正則（任一符合就算這次的）；cards＝全 App 流程圖那一份裡，flowStep（卡 id）符合的才算；output 省略＝docs/TRACKING_NOTES.md
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,6 +31,8 @@ if (!tn || !Array.isArray(tn.match) || tn.match.length === 0) {
   process.exit(2);
 }
 const patterns = tn.match.map((m) => new RegExp(m));
+/* 全 App 流程圖的便利貼都存在同一份（story.title＝總覽/UI Flow），用 flowStep（卡的 id）再篩一次：cards＝正則，例 ["^friends:"] */
+const cardPatterns = Array.isArray(tn.cards) ? tn.cards.map((m) => new RegExp(m)) : [];
 const outPath = join(folder, tn.output ?? "docs/TRACKING_NOTES.md");
 const notesDir = resolve(appDir, "design-system/tracking-notes");
 const eventsFile = resolve(appDir, "design-system/tracking-events/invoice-manager.json");
@@ -52,9 +54,14 @@ const picked = [];
 for (const name of files) {
   const data = JSON.parse(readFileSync(join(notesDir, name), "utf8"));
   const title = String(data.story?.title ?? "");
-  if (!patterns.some((re) => re.test(title))) continue;
-  if (!Array.isArray(data.notes) || data.notes.length === 0) continue;
-  picked.push({ name, data });
+  if (!Array.isArray(data.notes)) continue;
+  let notes = data.notes;
+  if (!patterns.some((re) => re.test(title))) {
+    if (cardPatterns.length === 0) continue;
+    notes = notes.filter((n) => typeof n.flowStep === "string" && cardPatterns.some((re) => re.test(n.flowStep)));
+  }
+  if (notes.length === 0) continue;
+  picked.push({ name, data: { ...data, notes } });
 }
 const total = picked.reduce((n, f) => n + f.data.notes.length, 0);
 const pendingNames = new Set();

@@ -81,7 +81,7 @@ node scripts/export-tracking-notes.mjs <交付資料夾>          # 產生／重
 node scripts/export-tracking-notes.mjs <交付資料夾> --check  # 只檢查有沒有過期（交付前檢查用）
 ```
 
-- 交付資料夾的 `handoff-preflight.json` 加 `"trackingNotes": { "match": ["<需求名>", "^Pages/(頁名|頁名)"], "output": "docs/TRACKING_NOTES.md" }`，`match` 比對便利貼檔的 `story.title`。
+- 交付資料夾的 `handoff-preflight.json` 加 `"trackingNotes": { "match": ["<需求名>", "^Pages/(頁名|頁名)"], "cards": ["^friends:"], "output": "docs/TRACKING_NOTES.md" }`：`match` 比對便利貼檔的 `story.title`；`cards` 給全 App 流程圖那一份用——它所有需求共用一個檔（`flow-overall.json`），用 `flowStep`（卡的 id，需求前綴開頭）篩出這次的。
 - 快照欄位：類型、畫面、點的位置、觸發、事件名、參數、補充、狀態、事件清單狀態（已在 PM 表／已登記待進表／不在清單）。
 - 腳本複本在本 skill `scripts/`，裝進專案 `scripts/`（它用 `../design-system/…` 找來源）。`handoff-preflight` skill 的第七類會核對快照是否過期；封存腳本依 `deliveryName` 自動重產。
 
@@ -104,6 +104,6 @@ node scripts/export-tracking-notes.mjs <交付資料夾> --check  # 只檢查有
 
 ## 版本紀錄
 
-- 2026-10-14：交付資料夾放自動產生的快照 `docs/TRACKING_NOTES.md`（`export-tracking-notes.mjs`），交付前檢查核對過期。
+- 2026-10-14：便利貼貼在全 App 流程圖上（`flow-overall.json`，`flowStep`＝頁面卡／狀態卡 id）；舊的走查便利貼搬過去（`migratedFrom`）。交付資料夾放自動產生的快照 `docs/TRACKING_NOTES.md`（`export-tracking-notes.mjs`），交付前檢查核對過期。
 - 2026-10-13：全 App 流程圖（UI Flow）當便利貼看板；工具列檢視器其他模式時外層便利貼不顯示；新埋點自動登記進事件清單（pending）、重複名字雙向自動修正、下拉標「待進 PM 表」、INDEX 補標現況；`scripts/sync-tracking-events.mjs`。
 - 2026-10-07：全域 skill 建立；`retitle_notes.py`、`rebuild_index.mjs`；addon 支援 `data-flow-board-story-title`。
