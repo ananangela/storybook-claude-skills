@@ -1,0 +1,26 @@
+import type { __FEATURE_PASCAL__RouteId } from "./__FEATURE_CAMEL__Flow";
+
+/** FAKE deterministic values for UI/mock review. Schema authority lives in docs/DATA_SPEC.md; these values never establish a backend contract. */
+export type __FEATURE_PASCAL__RouteContent = {
+  id: __FEATURE_PASCAL__RouteId;
+  title: string;
+  description: string;
+  /** Fixture-driven UI state so loading/empty/error branches stay reachable. */
+  state?: "default" | "loading" | "empty" | "error";
+};
+
+export const __FEATURE_CAMEL__Routes = [
+  {
+    description: "Replace this fixture with product-specific route content.",
+    id: "__ENTRY_ROUTE_ID__",
+    title: "__FEATURE_TITLE__",
+  },
+  // Add one fixture per route, and non-default state fixtures for branch
+  // states in scope, for example:
+  // {
+  //   description: "Shown while portfolio data loads.",
+  //   id: "portfolio-loading",
+  //   state: "loading",
+  //   title: "Loading portfolio",
+  // },
+] satisfies __FEATURE_PASCAL__RouteContent[];

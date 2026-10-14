@@ -1,0 +1,127 @@
+export const __FEATURE_CAMEL__RouteIds = [
+  "__ENTRY_ROUTE_ID__",
+] as const;
+
+export type __FEATURE_PASCAL__RouteId =
+  (typeof __FEATURE_CAMEL__RouteIds)[number];
+
+export const __FEATURE_CAMEL__FlowNodeIds = [] as const;
+
+export type __FEATURE_PASCAL__FlowNodeId =
+  (typeof __FEATURE_CAMEL__FlowNodeIds)[number];
+
+export type __FEATURE_PASCAL__FlowTargetId =
+  | __FEATURE_PASCAL__RouteId
+  | __FEATURE_PASCAL__FlowNodeId;
+
+export type __FEATURE_PASCAL__FormFactor = "phone" | "tablet" | "desktop";
+
+/** Review viewport for the whole flow; consumers without one assume phone 375x812. */
+export type __FEATURE_PASCAL__Viewport = {
+  formFactor: __FEATURE_PASCAL__FormFactor;
+  width: number;
+  height: number;
+};
+
+export type __FEATURE_PASCAL__Route = {
+  id: __FEATURE_PASCAL__RouteId;
+  title: string;
+  navigationId: string;
+  component?: string;
+  description?: string;
+  flowGroup?: string;
+  flowPosition?: {
+    x: number;
+    y: number;
+  };
+  /** Route parameters production navigation needs, e.g. [{ name: "alertId", type: "string" }]. */
+  params?: {
+    name: string;
+    type: string;
+  }[];
+  /** Deep-link entry pattern, e.g. "/alerts/:alertId" or "app://alerts/:alertId". */
+  deepLink?: string;
+  /** Per-route preview size override for mixed flows; falls back to the flow viewport. */
+  viewport?: {
+    width: number;
+    height: number;
+  };
+};
+
+export type __FEATURE_PASCAL__FlowNode = {
+  id: __FEATURE_PASCAL__FlowNodeId;
+  title: string;
+  description?: string;
+  flowGroup?: string;
+  flowPosition?: {
+    x: number;
+    y: number;
+  };
+  shape: "decision" | "state";
+  tone?: "default" | "success" | "error" | "warning";
+};
+
+export type __FEATURE_PASCAL__Transition = {
+  from: __FEATURE_PASCAL__FlowTargetId;
+  to: __FEATURE_PASCAL__FlowTargetId;
+  trigger: string;
+  label: string;
+  flowLine?: "key" | "reference" | "hidden";
+  sourceAnchor?: {
+    x: number;
+    y: number;
+  };
+  kind?:
+    | "primary"
+    | "return"
+    | "global"
+    | "secondary"
+    | "outcome"
+    | "condition";
+  /** How the target surface is presented (web modal vs page, iOS push vs sheet, Android dialog). */
+  presentation?: "push" | "modal" | "sheet" | "fullscreen" | "replace";
+  /** How the surface is left again; production back/dismiss semantics. */
+  backBehavior?: "pop" | "popToRoot" | "dismiss" | "none";
+  /** Explicit animation intent; omission in a draft never implies a default. Required for visible-route handoff. */
+  motion?: "none" | "platform-default" | "custom";
+  /** Required for custom motion: FLOW_SPEC.md#an-explicit-html-anchor. */
+  motionRef?: string;
+};
+
+export const __FEATURE_CAMEL__Routes = [
+  {
+    component: "__FEATURE_PASCAL__",
+    description: "Prototype entry route.",
+    flowGroup: "entry",
+    flowPosition: { x: 0, y: 0 },
+    id: "__ENTRY_ROUTE_ID__",
+    navigationId: "__ENTRY_ROUTE_ID__",
+    title: "__FEATURE_TITLE__",
+  },
+] satisfies __FEATURE_PASCAL__Route[];
+
+export const __FEATURE_CAMEL__FlowNodes: __FEATURE_PASCAL__FlowNode[] =
+  [] satisfies __FEATURE_PASCAL__FlowNode[];
+
+export const __FEATURE_CAMEL__Transitions: __FEATURE_PASCAL__Transition[] =
+  [] satisfies __FEATURE_PASCAL__Transition[];
+
+export const __FEATURE_CAMEL__Viewport = {
+  formFactor: "__FORM_FACTOR__",
+  height: __VIEWPORT_HEIGHT__,
+  width: __VIEWPORT_WIDTH__,
+} satisfies __FEATURE_PASCAL__Viewport;
+
+export const __FEATURE_CAMEL__Flow = {
+  nodes: __FEATURE_CAMEL__FlowNodes,
+  routes: __FEATURE_CAMEL__Routes,
+  transitions: __FEATURE_CAMEL__Transitions,
+  viewport: __FEATURE_CAMEL__Viewport,
+};
+
+export function get__FEATURE_PASCAL__Route(routeId: __FEATURE_PASCAL__RouteId) {
+  return (
+    __FEATURE_CAMEL__Routes.find((route) => route.id === routeId) ??
+    __FEATURE_CAMEL__Routes[0]
+  );
+}

@@ -1,0 +1,169 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+
+import "./__FEATURE_KEBAB__.css";
+import {
+  __FEATURE_CAMEL__Routes as __FEATURE_CAMEL__RouteContents,
+  type __FEATURE_PASCAL__RouteContent,
+} from "./__FEATURE_CAMEL__Data";
+import {
+  get__FEATURE_PASCAL__Route,
+  __FEATURE_CAMEL__Flow,
+  __FEATURE_CAMEL__RouteIds,
+  type __FEATURE_PASCAL__RouteId,
+} from "./__FEATURE_CAMEL__Flow";
+
+// Preview size comes from the flow contract at runtime so hand-edits to
+// Flow.viewport resize the shell without re-scaffolding.
+const shellViewport = __FEATURE_CAMEL__Flow.viewport ?? {
+  formFactor: "phone" as const,
+  height: 812,
+  width: 375,
+};
+
+const props = withDefaults(
+  defineProps<{
+    initialRouteId?: __FEATURE_PASCAL__RouteId;
+    isFlowPreview?: boolean;
+  }>(),
+  {
+    initialRouteId: "__ENTRY_ROUTE_ID__",
+    isFlowPreview: false,
+  },
+);
+
+function is__FEATURE_PASCAL__RouteId(
+  value: string | null,
+): value is __FEATURE_PASCAL__RouteId {
+  return __FEATURE_CAMEL__RouteIds.includes(value as __FEATURE_PASCAL__RouteId);
+}
+
+function getRouteFromLocation() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const routeId = new URLSearchParams(window.location.search).get("prototypeRoute");
+  return is__FEATURE_PASCAL__RouteId(routeId) ? routeId : undefined;
+}
+
+function getFlowPreviewFromLocation() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return new URLSearchParams(window.location.search).get("prototypeFlowPreview") === "true";
+}
+
+const previewRoute = getRouteFromLocation();
+const routeId = ref<__FEATURE_PASCAL__RouteId>(previewRoute ?? props.initialRouteId);
+const visibleRoute = computed(() => previewRoute ?? routeId.value);
+const activeRoute = computed(() => get__FEATURE_PASCAL__Route(visibleRoute.value));
+const routeContent = computed<__FEATURE_PASCAL__RouteContent>(
+  () =>
+    __FEATURE_CAMEL__RouteContents.find((route) => route.id === activeRoute.value.id) ??
+    __FEATURE_CAMEL__RouteContents[0],
+);
+const routeState = computed(() => routeContent.value.state ?? "default");
+const isEmbeddedFlowPreview = computed(
+  () => props.isFlowPreview || getFlowPreviewFromLocation(),
+);
+const routes = __FEATURE_CAMEL__RouteIds.map((id) => get__FEATURE_PASCAL__Route(id));
+
+function goTo(nextRoute: __FEATURE_PASCAL__RouteId) {
+  if (!previewRoute) {
+    routeId.value = nextRoute;
+  }
+}
+</script>
+
+<template>
+  <main
+    :class="[
+      '__FEATURE_CSS_CLASS__',
+      isEmbeddedFlowPreview ? '__FEATURE_CSS_CLASS__--flow-preview' : '',
+    ]"
+    data-prototype-root="true"
+    :data-route="visibleRoute"
+    aria-label="__FEATURE_TITLE__"
+    role="region"
+  >
+    <section
+      class="__FEATURE_CSS_CLASS____shell"
+      data-prototype-route-preview="true"
+      :style="{
+        '--prototype-flow-route-preview-height': `${activeRoute.viewport?.height ?? shellViewport.height}px`,
+        '--prototype-flow-route-preview-width': `${activeRoute.viewport?.width ?? shellViewport.width}px`,
+      }"
+    >
+      <!--
+        Prototype chrome (header + route nav) is review tooling, not product
+        UI — flow preview must render the bare route so UI Flow cards and
+        iframe previews match the real page.
+      -->
+      <header
+        v-if="!isEmbeddedFlowPreview"
+        class="__FEATURE_CSS_CLASS____header"
+      >
+        <div>
+          <p class="__FEATURE_CSS_CLASS____eyebrow">Prototype</p>
+          <h1>{{ activeRoute.title }}</h1>
+        </div>
+      </header>
+
+      <nav
+        v-if="!isEmbeddedFlowPreview"
+        class="__FEATURE_CSS_CLASS____nav"
+        aria-label="Prototype routes"
+      >
+        <button
+          v-for="route in routes"
+          :key="route.id"
+          type="button"
+          :aria-pressed="visibleRoute === route.id"
+          @click="goTo(route.id)"
+        >
+          {{ route.title }}
+        </button>
+      </nav>
+
+      <!--
+        Replace this placeholder markup with the design-system components mapped
+        per route in docs/UI_SPEC.md "Component Map". Import each mapped component
+        in the script block and reference it in PascalCase here. Local markup is
+        allowed only for regions listed under "Component Gaps".
+      -->
+      <section
+        class="__FEATURE_CSS_CLASS____panel"
+        :aria-labelledby="`${routeContent.id}-title`"
+      >
+        <p class="__FEATURE_CSS_CLASS____eyebrow">{{ routeContent.id }}</p>
+        <h2 :id="`${routeContent.id}-title`">{{ routeContent.title }}</h2>
+        <div
+          v-if="routeState === 'loading'"
+          class="__FEATURE_CSS_CLASS____state __FEATURE_CSS_CLASS____state--loading"
+          role="status"
+          :aria-label="`Loading ${routeContent.title}`"
+        >
+          <span class="__FEATURE_CSS_CLASS____skeleton" />
+          <span class="__FEATURE_CSS_CLASS____skeleton" />
+        </div>
+        <div
+          v-else-if="routeState === 'empty'"
+          class="__FEATURE_CSS_CLASS____state __FEATURE_CSS_CLASS____state--empty"
+        >
+          <p>{{ routeContent.description }}</p>
+        </div>
+        <div
+          v-else-if="routeState === 'error'"
+          class="__FEATURE_CSS_CLASS____state __FEATURE_CSS_CLASS____state--error"
+          role="alert"
+        >
+          <p>{{ routeContent.description }}</p>
+          <button type="button">Retry</button>
+        </div>
+        <p v-else>{{ routeContent.description }}</p>
+      </section>
+    </section>
+  </main>
+</template>
