@@ -306,6 +306,80 @@
   padding-inline-start: var(--pi-sys-spacing-container-xl);
 }
 
+/* markdown 表格：沿用 Data 分頁的表格樣式，但不強制 720 的最小寬度，窄表格才不會
+   被硬撐開；表格外框可水平捲動。 */
+.prototype-inspector__markdown-table-wrap {
+  margin-block-end: var(--ds-sys-spacing-none);
+}
+
+.prototype-inspector__markdown-table {
+  min-inline-size: 0;
+}
+
+.prototype-inspector__markdown-table td,
+.prototype-inspector__markdown-table th {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.prototype-inspector__markdown h5 {
+  margin: var(--ds-sys-spacing-none);
+  color: var(--ds-sys-color-on-surface-strong);
+  font-size: var(--ds-sys-typescale-body-sm-size);
+  font-weight: var(--ds-sys-weight-semibold);
+  line-height: var(--ds-sys-typescale-body-sm-line-height);
+}
+
+.prototype-inspector__markdown hr {
+  margin: var(--ds-sys-spacing-none);
+  border: 0;
+  border-block-start: var(--ds-sys-spacing-hairline) solid var(--ds-sys-color-outline-low);
+}
+
+.prototype-inspector__markdown-quote {
+  display: grid;
+  gap: var(--ds-sys-spacing-md);
+  margin: var(--ds-sys-spacing-none);
+  padding: var(--ds-sys-spacing-md) var(--ds-sys-spacing-l);
+  border-inline-start: var(--ds-sys-spacing-xs) solid var(--ds-sys-color-outline-low);
+  background: var(--ds-sys-color-surface-raised);
+  border-radius: var(--ds-sys-shape-corner-xs);
+}
+
+.prototype-inspector__markdown strong {
+  color: var(--ds-sys-color-on-surface-strong);
+  font-weight: var(--ds-sys-weight-semibold);
+}
+
+.prototype-inspector__markdown del {
+  color: var(--ds-sys-color-on-surface-subtle);
+}
+
+.prototype-inspector__markdown a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.prototype-inspector__markdown-image {
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--ds-sys-shape-corner-xs);
+}
+
+.prototype-inspector__markdown-li--nested {
+  margin-inline-start: calc(var(--ds-sys-spacing-container-xl) * var(--depth, 1));
+  list-style-type: circle;
+}
+
+.prototype-inspector__markdown-li--nested[data-depth="2"] {
+  --depth: 2;
+}
+
+.prototype-inspector__markdown-checkbox {
+  margin-inline-end: var(--ds-sys-spacing-xs);
+  vertical-align: middle;
+}
+
 .prototype-inspector__markdown code,
 .prototype-inspector__code,
 .prototype-inspector__markdown-code {
@@ -2266,3 +2340,81 @@
   font-size: var(--pi-sys-typescale-caption-sm-size);
   line-height: var(--pi-sys-typescale-caption-sm-line-height);
 }
+
+/* ------------------------------------------------------------------ */
+/* 「流程走查」模式(2026-09-30 起;2026-10-01 與 UI Flow 節點圖拆成兩個模式)。上面選流程,下面畫那一條。 */
+/* ------------------------------------------------------------------ */
+
+.prototype-storyboards {
+  min-height: 100vh;
+}
+
+.prototype-storyboards__bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #1f1f1f;
+  color: #ededed;
+  font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.prototype-storyboards__label {
+  font-weight: 700;
+}
+
+.prototype-storyboards__hint {
+  color: #9a9a9a;
+}
+
+.prototype-storyboards__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 100%;
+}
+
+.prototype-storyboards__tab {
+  padding: 3px 10px;
+  border: 1px solid #3a3a3a;
+  border-radius: 999px;
+  background: #2a2a2a;
+  color: #bdbdbd;
+  font: inherit;
+  cursor: pointer;
+}
+
+.prototype-storyboards__tab--related {
+  border-color: #3c8f85;
+  color: #e6f7f6;
+}
+
+.prototype-storyboards__tab--active {
+  background: #1d8f83;
+  border-color: #1d8f83;
+  color: #fff;
+}
+
+.prototype-storyboards__tab--ghost {
+  margin-left: auto;
+  background: transparent;
+}
+
+.prototype-storyboards__empty {
+  margin: 0;
+  padding: 48px 24px;
+  color: #6b6b6b;
+  font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 工具列 UI Flow:整頁嵌入 總覽/UI Flow 的全 App 流程圖 */
+.prototype-inspector__unified-flow { position: fixed; inset: 0; z-index: 1; background: var(--ds-sys-color-surface-sunken, #f3f4f6); }
+.prototype-inspector__unified-flow-frame { width: 100%; height: 100%; border: 0; display: block; }

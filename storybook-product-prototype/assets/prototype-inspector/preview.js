@@ -58,6 +58,8 @@ const prototypeComponentOriginLabels = {
 const prototypeComponentMissingStateLabel = "不在目前狀態";
 
 const defaultPrototypeModeGlobalName = "prototypeMode";
+/* 流程走查模式選了哪一條(storyboard id);帶在網址的 globals 裡,連結丟給別人打開就是同一條。 */
+const flowBoardGlobalName = "prototypeFlowBoard";
 const defaultPrototypeParameterName = "prototype";
 const routePreviewMeasurementSelector = '[data-prototype-route-preview="true"]';
 const previewHighlightStyleAttribute = "data-pi-highlight";
@@ -1521,12 +1523,18 @@ function PrototypeHeader({ eyebrow, title, description }) {
   );
 }
 
+/* 節點圖與 Components 的畫面預覽要用哪一則 story 來 iframe。預設是目前這一則(帶 prototypeRoute 參數);
+   原型可以在 meta 給 `routePreviewStoryId`,指定一則「認得 prototypeRoute 的 story」——
+   好友功能的畫面散在很多則 story 裡,只有 FriendsPrototype 那一則認得 route,所以從任何一頁切到
+   UI Flow 都改用它來畫每張卡。decorator 每次渲染都會更新這個值。 */
+let routePreviewStoryIdOverride = null;
+
 function getRoutePreviewSource(routeId, compositionId, propOverrides) {
   if (typeof window === "undefined") {
     return "";
   }
 
-  const storyId = new URLSearchParams(window.location.search).get("id");
+  const storyId = routePreviewStoryIdOverride ?? new URLSearchParams(window.location.search).get("id");
   if (!storyId) {
     return "";
   }
@@ -2747,10 +2755,12 @@ function PrototypeFlow({ prototype }) {
     };
   }, [setPanModifierActive]);
   const beginPan = (event) => {
+    // 滑鼠中鍵也能平移（2026-10-07）
+    const isMiddleButton = event.button === 1;
     if (
-      event.button !== 0 ||
       isEditableEventTarget(event.target) ||
-      !(isPanModifierActiveRef.current || event.metaKey)
+      (!isMiddleButton &&
+        (event.button !== 0 || !(isPanModifierActiveRef.current || event.metaKey)))
     ) {
       return;
     }
@@ -2875,7 +2885,8 @@ function PrototypeFlow({ prototype }) {
     setZoomMode("fit");
   };
   const zoomWithWheel = (event) => {
-    if (!event.altKey || isEditableEventTarget(event.target)) {
+    // ⌘／Ctrl（含觸控板捏合）或 Alt＋滾輪都能縮放（2026-10-07：與整個 Storybook 的 Figma 式操作一致）
+    if (!(event.altKey || event.ctrlKey || event.metaKey) || isEditableEventTarget(event.target)) {
       return;
     }
 
@@ -3587,6 +3598,30 @@ function PrototypeDataTable({ columns, emptyMessage = "No data found.", rows }) 
   );
 }
 
+function PrototypeAnalyticsParams({ value }) {
+  if (!isRecord(value) || !value.key) {
+    return "-";
+  }
+
+  const values = Array.isArray(value.values) ? value.values.filter(isRecord) : [];
+
+  return createElement(
+    Fragment,
+    null,
+    createElement(PrototypeDataCode, { value: value.key }),
+    values.length > 0
+      ? createElement(
+          PrototypeDataTags,
+          {
+            value: values.map((item) =>
+              item.label ? `${item.value}（${item.label}）` : item.value,
+            ),
+          },
+        )
+      : null,
+  );
+}
+
 function PrototypeDataSchemas({ schemas }) {
   if (schemas.length === 0) {
     return null;
@@ -3656,6 +3691,14 @@ function PrototypeData({ prototype }) {
     data.routeDataRequirements ?? data.routeRequirements,
   );
   const stateRules = normalizeDataItems(data.stateRules ?? data.states);
+  /* 埋點事件表(選填)。沒有這個 key 的 prototype 完全不受影響——整個區塊
+     跟其他區塊一樣,是 `length > 0` 才渲染。 */
+  const analyticsEvents = normalizeDataItems(
+    data.analyticsEvents ?? data.analytics ?? data.trackingEvents,
+  );
+  const analyticsOpenQuestions = normalizeDataItems(
+    data.analyticsOpenQuestions ?? data.analyticsGaps,
+  );
 
   return createElement(
     "div",
@@ -3807,6 +3850,80 @@ function PrototypeData({ prototype }) {
                       route: route.id,
                       state: route.title ?? route.id,
                     })),
+            }),
+          )
+        : null,
+      analyticsEvents.length > 0
+        ? createElement(
+            PrototypeDataSection,
+            {
+              description:
+                "Tracking events to implement, mapped back to the routes and transitions in this flow.",
+              title: "Analytics Events",
+            },
+            createElement(PrototypeDataTable, {
+              columns: [
+                {
+                  key: "event",
+                  label: "Event",
+                  render: (item) =>
+                    createElement(PrototypeDataCode, { value: item.event }),
+                },
+                { key: "name", label: "Name" },
+                { key: "definition", label: "Definition" },
+                { key: "trigger", label: "Trigger" },
+                {
+                  key: "params",
+                  label: "Params",
+                  render: (item) =>
+                    createElement(PrototypeAnalyticsParams, {
+                      value: item.params,
+                    }),
+                },
+                {
+                  key: "routes",
+                  label: "Routes",
+                  render: (item) =>
+                    createElement(PrototypeDataTags, { value: item.routes }),
+                },
+                {
+                  key: "transitions",
+                  label: "Transitions",
+                  render: (item) =>
+                    createElement(PrototypeDataTags, {
+                      value: item.transitions,
+                    }),
+                },
+              ],
+              rows: analyticsEvents,
+            }),
+          )
+        : null,
+      analyticsOpenQuestions.length > 0
+        ? createElement(
+            PrototypeDataSection,
+            {
+              description:
+                "Gaps between the tracking plan and this flow. Open questions, not decisions.",
+              title: "Analytics Open Questions",
+            },
+            createElement(PrototypeDataTable, {
+              columns: [
+                {
+                  key: "id",
+                  label: "Id",
+                  render: (item) =>
+                    createElement(PrototypeDataCode, { value: item.id }),
+                },
+                { key: "question", label: "Open question" },
+                {
+                  key: "routes",
+                  label: "Routes",
+                  render: (item) =>
+                    createElement(PrototypeDataTags, { value: item.routes }),
+                },
+              ],
+              rows: analyticsOpenQuestions,
             }),
           )
         : null,
@@ -7599,6 +7716,120 @@ function PrototypeComponents({ prototype }) {
   );
 }
 
+/**
+ * 「流程走查」模式(2026-09-30 起;2026-10-01 從 UI Flow 拆出來自成一個模式):
+ * 每一條流程照人實際操作的順序一步一格,每格是真的畫面。
+ *
+ * `prototype.storyboards` 給的是 `{ id, title, related?: string[], render: () => ReactNode }`:
+ * `related` 是這條流程會經過的 story title,切過來時先列「這則畫面出現的流程」再列其他;
+ * 「本身就是流程」的那一則預設畫它,純狀態的畫面只列清單不自動畫;選擇記在網址的 globals(`prototypeFlowBoard`)。
+ * 節點圖(所有畫面與跳轉線)在工具列的「UI Flow」模式。
+ */
+/* 上一次畫流程走查時是哪一則 story。換了 story 就不沿用之前選的流程,改回「這則畫面出現的第一條」;
+   第一次載入(從別人丟來的連結打開)則照網址上選的那一條。放在模組層級是因為換 story 時元件會被重新掛載。 */
+let storyboardsLastStoryId = null;
+
+function PrototypeStoryboards({ prototype, context }) {
+  const boards = Array.isArray(prototype.storyboards)
+    ? prototype.storyboards.filter((board) => board && typeof board.id === "string" && typeof board.render === "function")
+    : [];
+  const storyId = typeof context?.id === "string" ? context.id : "";
+  const storyTitle = typeof context?.title === "string" ? context.title : "";
+  const storyName = typeof context?.name === "string" ? context.name : "";
+  /* `related` 可以寫到群組(「好友功能/加好友流程」)或寫到某一則(「好友功能/加好友流程/掃描載具條碼加好友」)。
+     寫到那一則的最相關,排最前面、預設就畫它;只寫到群組的其次;都沒有的排最後。 */
+  const storyPath = `${storyTitle}/${storyName}`;
+  const relevance = (board) => {
+    if (!Array.isArray(board.related)) return 0;
+    let score = 0;
+    board.related.forEach((prefix) => {
+      if (storyPath === prefix) score = Math.max(score, 2);
+      else if (storyPath.startsWith(`${prefix}/`) || storyTitle === prefix) score = Math.max(score, 1);
+    });
+    return score;
+  };
+  const isRelated = (board) => relevance(board) > 0;
+  const related = boards.filter(isRelated).sort((a, b) => relevance(b) - relevance(a));
+  const others = boards.filter((board) => !isRelated(board));
+  const ordered = [...related, ...others];
+  /* 「這一則自己的流程」:related 寫到這一則 story 的才算。只寫到群組的(這一頁出現在哪些流程)
+     只列出來、不自動畫——純狀態的畫面(空狀態、長暱稱⋯)沒有自己的流程,自動畫會讓人以為那條跟它有關
+     (2026-09-30 使用者指示)。 */
+  const own = related.filter((board) => relevance(board) === 2);
+  const requested = context?.globals?.[flowBoardGlobalName];
+  const storyChanged = storyboardsLastStoryId !== null && storyboardsLastStoryId !== storyId;
+  const selected = (storyChanged ? null : ordered.find((board) => board.id === requested)) ?? own[0] ?? null;
+
+  const select = (id) => {
+    addons.getChannel().emit(UPDATE_GLOBALS, { globals: { [flowBoardGlobalName]: id } });
+  };
+
+  useEffect(() => {
+    storyboardsLastStoryId = storyId;
+    /* 換了 story:把網址上的選擇同步成現在畫的這一條,連結複製出去才是對的。 */
+    if (storyChanged && (selected ? selected.id : "") !== (requested ?? "")) select(selected ? selected.id : "");
+  }, [storyId]);
+
+  /* 右側的小按鈕:切到工具列的「UI Flow」模式看節點圖(所有畫面與跳轉線的總覽)。 */
+  const showGraph = () => {
+    addons.getChannel().emit(UPDATE_GLOBALS, { globals: { [defaultPrototypeModeGlobalName]: "flow" } });
+  };
+
+  return createElement(
+    "div",
+    { className: "prototype-storyboards" },
+    createElement(
+      "div",
+      { className: "prototype-storyboards__bar" },
+      createElement("span", { className: "prototype-storyboards__label" }, "流程走查"),
+      createElement(
+        "span",
+        { className: "prototype-storyboards__hint" },
+        own.length > 0
+          ? `這一則的流程${own.length > 1 ? `有 ${own.length} 條` : ""};亮的是經過這一頁的流程`
+          : related.length > 0
+            ? "這一頁沒有對應的流程;亮的是經過這一頁的流程,點一條可以看"
+            : "這一頁沒有對應的流程;點一條可以看別的流程",
+      ),
+      createElement(
+        "nav",
+        { "aria-label": "選擇流程", className: "prototype-storyboards__tabs" },
+        ordered.map((board) =>
+          createElement(
+            "button",
+            {
+              "aria-pressed": selected?.id === board.id,
+              className: [
+                "prototype-storyboards__tab",
+                isRelated(board) ? "prototype-storyboards__tab--related" : "",
+                selected?.id === board.id ? "prototype-storyboards__tab--active" : "",
+              ]
+                .filter(Boolean)
+                .join(" "),
+              key: board.id,
+              onClick: () => select(board.id),
+              type: "button",
+            },
+            board.title,
+          ),
+        ),
+      ),
+      createElement(
+        "button",
+        { className: "prototype-storyboards__tab prototype-storyboards__tab--ghost", onClick: showGraph, title: "切到 UI Flow 模式:所有畫面與跳轉線的總覽", type: "button" },
+        "節點圖（UI Flow）→",
+      ),
+    ),
+    selected
+      ? createElement("div", { className: "prototype-storyboards__board", key: selected.id }, selected.render())
+      : createElement(
+          "p",
+          { className: "prototype-storyboards__empty" },
+          boards.length > 0 ? "這一頁沒有對應的流程。上面點一條可以看其他流程。" : "這個原型還沒有流程走查。",
+        ),
+  );
+}
+
 function PrototypeEmpty({ message }) {
   return createElement(
     "div",
@@ -7614,6 +7845,10 @@ function createPrototypeInspectorDecorator(options = {}) {
   return (Story, context) => {
     const prototypeMode = getPrototypeMode(context.globals?.[globalName]);
     const prototype = getPrototypeParameter(context, parameterName);
+    routePreviewStoryIdOverride =
+      prototype && typeof prototype.routePreviewStoryId === "string" && prototype.routePreviewStoryId.trim()
+        ? prototype.routePreviewStoryId.trim()
+        : null;
 
     if (prototypeMode === "story" || !prototype) {
       return Story();
@@ -7623,8 +7858,10 @@ function createPrototypeInspectorDecorator(options = {}) {
       return createElement(PrototypeDocs, { prototype });
     }
 
-    if (prototypeMode === "flow") {
-      return createElement(PrototypeFlow, { prototype });
+    if (prototypeMode === "flow" || prototypeMode === "storyboards") {
+      /* UI Flow(2026-10-13 起)＝全 App 流程圖(總覽/UI Flow 那一則)嵌進來,開的時候自動釘選這一頁所屬的需求。
+         節點圖與流程走查(一步一格)都併在裡面:狀態卡＋「流程走查清單」一步一步。舊的 PrototypeFlow／PrototypeStoryboards 保留程式,不再掛。 */
+      return createElement(PrototypeUnifiedFlow, { context, prototype });
     }
 
     if (prototypeMode === "components") {
@@ -7635,6 +7872,45 @@ function createPrototypeInspectorDecorator(options = {}) {
   };
 }
 
+/** 原型 id → 全 App 流程圖裡的需求鍵(FEATURE_ORDER)。新專案建議在原型 meta 直接給 `flowScope`、`unifiedFlowStoryId`,不用改這張表。 */
+const UNIFIED_FLOW_FEATURE_BY_PROTOTYPE_ID = {
+  "friends-prototype": "friends",
+  "treasure-box-prototype": "explore",
+  "account-deletion-prototype": "deletion",
+};
+const UNIFIED_FLOW_STORY_ID = "總覽-ui-flow--flow-chart";
+
+function getUnifiedFlowUrl(prototype, context) {
+  if (typeof window === "undefined") return "";
+  const url = new URL(window.location.href);
+  if (!url.pathname.endsWith("/iframe.html")) url.pathname = `${url.pathname.replace(/\/$/, "")}/iframe.html`;
+  url.hash = "";
+  url.search = "";
+  /* 嵌哪一則：原型 meta 的 unifiedFlowStoryId 優先（換專案時改這裡），沒有就用預設的總覽那一則 */
+  url.searchParams.set("id", (typeof prototype?.unifiedFlowStoryId === "string" && prototype.unifiedFlowStoryId) || UNIFIED_FLOW_STORY_ID);
+  url.searchParams.set("viewMode", "story");
+  url.searchParams.set("globals", createStorybookGlobals({ [defaultPrototypeModeGlobalName]: "story" }));
+  /* 只畫這一頁所屬的需求(總覽那一則自己開才是全 App);對不到需求的原型就顯示全 App */
+  /* 原型 meta 可直接給 flowScope（需求鍵），沒有就查對照表 */
+  const feature = (typeof prototype?.flowScope === "string" && prototype.flowScope) || UNIFIED_FLOW_FEATURE_BY_PROTOTYPE_ID[prototype?.id];
+  if (feature) url.searchParams.set("scope", feature);
+  /* 帶 story 標題過去：流程圖用它查這一頁對到哪個畫面,只畫跟這一頁有關的流程(pageRoutes.ts) */
+  if (context?.title) url.searchParams.set("page", context.title);
+  url.searchParams.set("embedded", "inspector");
+  return url.toString();
+}
+
+/** 工具列 UI Flow:整頁嵌入全 App 流程圖。 */
+function PrototypeUnifiedFlow({ prototype, context }) {
+  const src = getUnifiedFlowUrl(prototype, context);
+  if (!src) return null;
+  return createElement(
+    "div",
+    { className: "prototype-inspector__unified-flow" },
+    createElement("iframe", { className: "prototype-inspector__unified-flow-frame", src, title: "全 App 流程圖" }),
+  );
+}
+
 export const decorators = [createPrototypeInspectorDecorator()];
 
 export const globalTypes = {
@@ -7642,8 +7918,13 @@ export const globalTypes = {
     defaultValue: "story",
     description: "Controls the Prototype toolbar canvas mode.",
   },
+  [flowBoardGlobalName]: {
+    defaultValue: "",
+    description: "Which storyboard the 流程走查 mode shows.",
+  },
 };
 
 export const initialGlobals = {
   [defaultPrototypeModeGlobalName]: "story",
+  [flowBoardGlobalName]: "",
 };

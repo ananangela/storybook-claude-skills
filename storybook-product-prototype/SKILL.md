@@ -251,3 +251,13 @@ Run `python3 <skill-root>/scripts/test_scaffold_validate.py` after changing the 
 - A passing `--handoff-ready` run leaves a version-2 manifest with complete covered carrier hashes. Named, dated, scoped semantic review remains separate from hash integrity and demo confirmation.
 - Storybook `parameters.prototype` remains the review contract.
 - Runtime UI Flow rendering is provided by the bundled Prototype Inspector when installed, or by an existing project-specific viewer when present.
+
+## 檢視器 2026-10-14 版（assets/prototype-inspector/，與發票載具倉庫同步）
+
+- 工具列模式：Story／Docs／UI Flow／Components／Data。**「流程走查」模式已拿掉**（舊的 `storyboards` 值會當 UI Flow）。
+- **UI Flow 改成嵌入「全 App 流程圖」那一則 story**（iframe），開的時候自動只畫跟目前這一頁有關的流程；總覽那一則自己開才是全 App。原型 meta 可給：
+  - `unifiedFlowStoryId`：要嵌哪一則（預設 `總覽-ui-flow--flow-chart`）。
+  - `flowScope`：這個原型屬於全 App 流程圖的哪個需求鍵（沒給就查 preview.js 裡的對照表 `UNIFIED_FLOW_FEATURE_BY_PROTOTYPE_ID`）。
+  - 流程圖本身（`OverallFlowChart`、`pageRoutes.ts`、`storyboardStepRoutes.ts`）在發票載具倉庫 `src/stories/overview/`，不在本 skill；沒有那張圖的專案，UI Flow 會是空的——要嘛把那組檔案搬過去，要嘛把 `PrototypeUnifiedFlow` 換回舊的 `PrototypeFlow`（程式還在，只是沒掛）。
+- Data 頁籤多了「Analytics Events」「Analytics Open Questions」區（`data.analyticsEvents`／`analyticsOpenQuestions`，選填）。
+- 舊版（2026-09-18，節點圖自己畫、流程走查獨立模式）的行為不再維護。

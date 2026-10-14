@@ -35,6 +35,7 @@ mkdir -p ~/.claude/skills && git clone https://github.com/ananangela/storybook-c
 
 ## 更新
 
+- 2026-10-14：原型契約 skill 的檢視器更新到最新版（UI Flow 嵌入全 App 流程圖、流程走查模式拿掉、Data 多埋點事件區；meta 可給 unifiedFlowStoryId／flowScope）。
 - 2026-10-14：加入交付用的四個 skill（handoff-preflight、storybook-product-prototype、deliverable-doc-rules、storybook-tracking-handoff）；便利貼快照腳本。
 
 - 2026-10-13：便利貼 ＝ 新埋點自動登記事件清單、重複名字自動修正、UI Flow 當便利貼看板；流程走查 ＝ 併進 UI Flow（狀態卡、一步一步）。裝過的人再跑一次安裝那一行就是最新版。

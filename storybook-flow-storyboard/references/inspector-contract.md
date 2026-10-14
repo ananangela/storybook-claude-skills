@@ -1,5 +1,8 @@
 # Prototype Inspector 的「流程走查」模式契約
 
+
+> **2026-10-13 起**：檢視器的「流程走查」模式已拿掉，`storyboards` 陣列仍要給——全 App 流程圖用它畫狀態卡與「一步一步」，便利貼也靠它對位。契約不變。
+
 `parameters.prototype.storyboards` 是陣列，每項：
 
 ```ts

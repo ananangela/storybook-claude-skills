@@ -15,7 +15,10 @@ import {
 const prototypeInspectorModes = [
   { id: "story", label: "Story" },
   { id: "docs", label: "Docs" },
+  /* UI Flow＝節點圖(所有畫面與跳轉線的總覽,skill 的 Static Flow 匯出走這個);
+     流程走查＝一步一格的真畫面,PM 貼埋點便利貼的地方(2026-10-01 拆成兩個模式)。 */
   { id: "flow", label: "UI Flow" },
+  { id: "storyboards", label: "流程走查" },
   { id: "components", label: "Components" },
   { id: "data", label: "Data" },
 ];
