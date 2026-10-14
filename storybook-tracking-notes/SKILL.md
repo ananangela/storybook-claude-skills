@@ -72,6 +72,19 @@ description: >-
 6. 相依套件：`html-to-image`（截圖）、`@storybook/icons`。
 7. 啟動後確認：畫面右下角有「＋ 新增便利貼」，工具列有「便利貼」按鈕，`GET /__tracking_notes/status` 回 200。
 
+## 交付資料夾的快照（2026-10-14 起）
+
+便利貼與事件清單**不搬進交付資料夾**（全 App 一份是「既有／新」判斷的基準）。交付資料夾只放一份自動產生的快照 `docs/TRACKING_NOTES.md`：
+
+```bash
+node scripts/export-tracking-notes.mjs <交付資料夾>          # 產生／重產
+node scripts/export-tracking-notes.mjs <交付資料夾> --check  # 只檢查有沒有過期（交付前檢查用）
+```
+
+- 交付資料夾的 `handoff-preflight.json` 加 `"trackingNotes": { "match": ["<需求名>", "^Pages/(頁名|頁名)"], "output": "docs/TRACKING_NOTES.md" }`，`match` 比對便利貼檔的 `story.title`。
+- 快照欄位：類型、畫面、點的位置、觸發、事件名、參數、補充、狀態、事件清單狀態（已在 PM 表／已登記待進表／不在清單）。
+- 腳本複本在本 skill `scripts/`，裝進專案 `scripts/`（它用 `../design-system/…` 找來源）。`handoff-preflight` skill 的第七類會核對快照是否過期；封存腳本依 `deliveryName` 自動重產。
+
 ## 維護：改名與搬家
 
 - **改 Storybook 群組名**（例：`Prototypes/好友功能/` → `當次交付/2026-09_好友功能/`）：
@@ -91,5 +104,6 @@ description: >-
 
 ## 版本紀錄
 
+- 2026-10-14：交付資料夾放自動產生的快照 `docs/TRACKING_NOTES.md`（`export-tracking-notes.mjs`），交付前檢查核對過期。
 - 2026-10-13：全 App 流程圖（UI Flow）當便利貼看板；工具列檢視器其他模式時外層便利貼不顯示；新埋點自動登記進事件清單（pending）、重複名字雙向自動修正、下拉標「待進 PM 表」、INDEX 補標現況；`scripts/sync-tracking-events.mjs`。
 - 2026-10-07：全域 skill 建立；`retitle_notes.py`、`rebuild_index.mjs`；addon 支援 `data-flow-board-story-title`。
