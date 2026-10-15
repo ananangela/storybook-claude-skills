@@ -7889,12 +7889,14 @@ function getUnifiedFlowUrl(prototype, context) {
   /* 嵌哪一則：原型 meta 的 unifiedFlowStoryId 優先（換專案時改這裡），沒有就用預設的總覽那一則 */
   url.searchParams.set("id", (typeof prototype?.unifiedFlowStoryId === "string" && prototype.unifiedFlowStoryId) || UNIFIED_FLOW_STORY_ID);
   url.searchParams.set("viewMode", "story");
-  url.searchParams.set("globals", createStorybookGlobals({ [defaultPrototypeModeGlobalName]: "story" }));
-  /* 只畫這一頁所屬的需求(總覽那一則自己開才是全 App);對不到需求的原型就顯示全 App */
-  /* 原型 meta 可直接給 flowScope（需求鍵），沒有就查對照表 */
+  /* 只畫這一頁所屬的需求／跟這一頁有關的流程:範圍用 globals 帶過去(flowScope＝需求鍵,原型 meta 可直接給、沒有就查對照表;flowPage＝story 標題)。
+     Storybook 載入時會重寫網址、只留它認得的參數,自訂參數(scope=／page=)會被洗掉,畫到一半變成全 App 圖;globals 它會留著。 */
   const feature = (typeof prototype?.flowScope === "string" && prototype.flowScope) || UNIFIED_FLOW_FEATURE_BY_PROTOTYPE_ID[prototype?.id];
+  /* 只放這三個 globals,不把外層目前的 globals 全部帶過去:不然工具列隨便切個開關(便利貼、工作區背景)網址就變,iframe 重載、畫面閃一下 */
+  const pairs = [[defaultPrototypeModeGlobalName, "story"], ["flowScope", feature || ""], ["flowPage", context?.title || ""]].filter(([, v]) => v);
+  url.searchParams.set("globals", pairs.map(([k, v]) => `${k}:${v}`).join(";"));
+  /* 舊的自訂參數留著當第一次畫的備援 */
   if (feature) url.searchParams.set("scope", feature);
-  /* 帶 story 標題過去：流程圖用它查這一頁對到哪個畫面,只畫跟這一頁有關的流程(pageRoutes.ts) */
   if (context?.title) url.searchParams.set("page", context.title);
   url.searchParams.set("embedded", "inspector");
   return url.toString();
