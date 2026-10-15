@@ -259,5 +259,6 @@ Run `python3 <skill-root>/scripts/test_scaffold_validate.py` after changing the 
   - `unifiedFlowStoryId`：要嵌哪一則（預設 `總覽-ui-flow--flow-chart`）。
   - `flowScope`：這個原型屬於全 App 流程圖的哪個需求鍵（沒給就查 preview.js 裡的對照表 `UNIFIED_FLOW_FEATURE_BY_PROTOTYPE_ID`）。
   - 流程圖本身（`OverallFlowChart`、`pageRoutes.ts`、`storyboardStepRoutes.ts`）在發票載具倉庫 `src/stories/overview/`，不在本 skill；沒有那張圖的專案，UI Flow 會是空的——要嘛把那組檔案搬過去，要嘛把 `PrototypeUnifiedFlow` 換回舊的 `PrototypeFlow`（程式還在，只是沒掛）。
+- 範圍用 globals 帶：專案的 `.storybook/preview.ts` 要在 `globalTypes` 宣告 `flowScope`、`flowPage`（沒有工具列，`initialGlobals` 給空字串），嵌入的流程圖 story 讀 `context.globals.flowPage／flowScope` 決定只畫哪一頁的相關流程。沒宣告的話 Storybook 會忽略網址上的 globals，畫面會閃一下變成全 App 圖。
 - Data 頁籤多了「Analytics Events」「Analytics Open Questions」區（`data.analyticsEvents`／`analyticsOpenQuestions`，選填）。
 - 舊版（2026-09-18，節點圖自己畫、流程走查獨立模式）的行為不再維護。
