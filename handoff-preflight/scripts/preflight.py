@@ -2,6 +2,8 @@
 """交付前檢查（handoff preflight）。
 
 用法：python3 preflight.py <交付資料夾>   （資料夾裡要有 handoff-preflight.json）
+      python3 preflight.py --status-all <倉庫根目錄> [stories 目錄，預設 app/src]
+                                        （只跑第八類「狀態一致」，一次看所有需求）
 
 把「原型改了文件沒跟上、舊規則沒清乾淨、狀態沒想完、定案編號指錯」這幾類問題變成機器抓。
 任何一項 [錯誤] 都要修好才能推交付文件；[提醒] 要看過、確認沒問題。
@@ -283,6 +285,179 @@ def check_tracking_notes(cfg, folder: Path, root: Path, errors, notes):
         notes.append("便利貼快照：" + (tail[-1] if tail else "最新"))
 
 
+# ---------------------------------------------------------------- 第八類：狀態一致（2026-10-16 起）
+# 側欄依狀態分組：story title 以「設計中/」「開發中/」「已上線/」開頭，底下是 YYYY-MM_功能名。
+# 畫面本體只有一份在 Pages，用 tags 標 status-designing／status-delivered／status-live（左上角標籤）。
+# 兩邊要一致：改群組的人要同時改頁面標籤，而且只在 PM 說上線後才動。
+STATUS_GROUPS = ("設計中", "開發中", "已上線")
+EXPECTED_TAG = {"設計中": "status-designing", "開發中": "status-delivered", "已上線": "status-live"}
+STATUS_TAGS = set(EXPECTED_TAG.values())
+GROUP_RE = re.compile(r"^(設計中|開發中|已上線)/([^/]+)")
+META_START_RE = re.compile(r"(?:const\s+meta\b[^=\n]*=\s*|export\s+default\s+)(\{)")
+TITLE_RE = re.compile(r"""\btitle\s*[:=]\s*["'`]([^"'`\n]+)["'`]""")
+
+
+class StoryInfo:
+    def __init__(self, file: Path, title: str, tag: str | None):
+        self.file, self.title, self.tag = file, title, tag
+
+
+def story_meta(src: str) -> tuple[str | None, str | None]:
+    """回傳 (meta 的 title, meta 層 tags 裡的 status-* 標籤)。MDX 只有 <Meta title>。"""
+    m = META_START_RE.search(src)
+    if m:
+        start = m.start(1)
+        meta = src[start: balanced(src, start, "{", "}")]
+    else:
+        mdx = re.search(r"<Meta\b[^>]*>", src)
+        meta = mdx.group(0) if mdx else ""
+    t = TITLE_RE.search(meta)
+    if not t:
+        return None, None
+    tag = None
+    tm = re.search(r"\btags\s*:\s*\[([^\]]*)\]", meta)
+    if tm:
+        for x in re.findall(r"""["'`]([^"'`]+)["'`]""", tm.group(1)):
+            if x in STATUS_TAGS:
+                tag = x
+    return t.group(1), tag
+
+
+def scan_stories(base: Path) -> list[StoryInfo]:
+    out = []
+    for f in sorted(base.rglob("*")):
+        if not f.is_file() or "node_modules" in f.parts:
+            continue
+        if not (f.name.endswith((".stories.tsx", ".stories.ts", ".stories.jsx", ".stories.js")) or f.suffix == ".mdx"):
+            continue
+        title, tag = story_meta(read(f))
+        if title:
+            out.append(StoryInfo(f, title, tag))
+    return out
+
+
+def under(f: Path, d: Path) -> bool:
+    try:
+        f.relative_to(d)
+        return True
+    except ValueError:
+        return False
+
+
+def pages_for(name: str, index: list[StoryInfo], dirs: list[Path], titles: list[str]) -> list[StoryInfo]:
+    """這個需求「所屬的頁」＝ 明確列出的 Pages 標題 ∪ 指定資料夾底下的 Pages story ∪ 群組 story 自己帶了狀態標籤的。"""
+    pages: dict[Path, StoryInfo] = {}
+    for s in index:
+        g = GROUP_RE.match(s.title)
+        if g and g.group(2) == name and s.tag:
+            pages[s.file] = s
+        if s.title in titles:
+            pages[s.file] = s
+        if s.title.startswith("Pages/") and any(under(s.file, d) for d in dirs):
+            pages[s.file] = s
+    return [pages[k] for k in sorted(pages)]
+
+
+def status_issues(name: str, index: list[StoryInfo], pages: list[StoryInfo], root: Path):
+    """核心比對。回傳 (group, errors, warnings, notes)。"""
+    errors, warnings, notes = [], [], []
+
+    def rel(f: Path) -> str:
+        return str(f.resolve().relative_to(root)) if under(f.resolve(), root) else str(f)
+
+    groups: dict[str, Path] = {}
+    for s in index:
+        g = GROUP_RE.match(s.title)
+        if g and g.group(2) == name:
+            groups.setdefault(g.group(1), s.file)
+    if not groups:
+        notes.append(f"狀態一致：側欄找不到「設計中／開發中／已上線 / {name}」，跳過（deliveryName 要跟側欄的需求資料夾同名）。")
+        return None, errors, warnings, notes
+    if len(groups) > 1:
+        errors.append(f"[狀態一致] 「{name}」同時出現在 " + "、".join(f"「{g}」（{rel(f)}）" for g, f in sorted(groups.items())) + "。同一個需求只能在一個群組，請統一。")
+        return None, errors, warnings, notes
+    group = next(iter(groups))
+    expected = EXPECTED_TAG[group]
+    for p in pages:
+        shown = p.tag or "沒有狀態標籤"
+        if group == "已上線" and p.tag != "status-live":
+            errors.append(f"[狀態一致] 群組是「已上線/{name}」，但「{p.title}」是 {shown}（{rel(p.file)}）→ 改成 tags: [\"status-live\"]。")
+        elif group != "已上線" and p.tag == "status-live":
+            errors.append(f"[狀態一致] 群組是「{group}/{name}」，但「{p.title}」是 status-live（{rel(p.file)}）→ 改回 tags: [\"{expected}\"]；若 PM 已說上線，就把群組也改成「已上線」（兩邊要同一次改）。")
+        elif p.tag != expected:
+            warnings.append(f"[狀態一致] 群組是「{group}/{name}」，「{p.title}」是 {shown}（{rel(p.file)}），通常應為 {expected}。")
+    if pages:
+        notes.append(f"狀態一致：「{name}」在「{group}」，比對了 {len(pages)} 頁的狀態標籤（應為 {expected}）。")
+    else:
+        notes.append(f"狀態一致：「{name}」在「{group}」，找不到帶狀態標籤的頁（畫面還沒進 Pages），只確認了群組。")
+    return group, errors, warnings, notes
+
+
+def status_pages(cfg, folder: Path, name: str, index: list[StoryInfo]) -> list[StoryInfo]:
+    """從設定推這個需求所屬的頁：status.pages（明確列 Pages 標題）＋ status.pageDirs（預設＝codeDirs）底下的 Pages story。"""
+    st = cfg.get("status", {})
+    dirs = [(folder / d).resolve() for d in st.get("pageDirs", cfg.get("codeDirs", ["."]))]
+    return pages_for(name, index, dirs, st.get("pages", []))
+
+
+def check_status(cfg, folder: Path, root: Path, errors, warnings, notes):
+    """第八類：這個需求的側欄群組與它所屬 Pages 頁的 status-* 標籤要一致。"""
+    st = cfg.get("status", {})
+    index = scan_stories((root / st.get("storiesDir", "app/src")).resolve())
+    name = cfg.get("deliveryName") or st.get("deliveryName")
+    if not name:
+        own = {GROUP_RE.match(s.title).group(2) for s in index if under(s.file, folder) and GROUP_RE.match(s.title)}
+        if len(own) != 1:
+            notes.append("狀態一致：設定沒有 deliveryName、資料夾裡也推不出唯一的需求名，跳過。")
+            return
+        name = own.pop()
+    _, e, w, n = status_issues(name, index, status_pages(cfg, folder, name, index), root)
+    errors.extend(e)
+    warnings.extend(w)
+    notes.extend(n)
+
+
+def status_all(root: Path, stories_rel: str = "app/src") -> int:
+    """整個倉庫跑一次狀態一致：每個側欄需求都比對（有 handoff-preflight.json 的用它的對應；沒有的用群組 story 所在資料夾推）。"""
+    root = root.resolve()
+    stories_dir = (root / stories_rel).resolve()
+    index = scan_stories(stories_dir)
+    configs: dict[str, tuple[Path, dict]] = {}
+    for cfg_path in sorted(stories_dir.rglob("handoff-preflight.json")):
+        cfg = json.loads(read(cfg_path))
+        if cfg.get("deliveryName"):
+            configs[cfg["deliveryName"]] = (cfg_path.parent, cfg)
+    names = sorted({GROUP_RE.match(s.title).group(2) for s in index if GROUP_RE.match(s.title)})
+    total_errors = 0
+    print(f"狀態一致檢查：{root}（{len(names)} 個需求）\n")
+    for name in names:
+        if name in configs:
+            folder, cfg = configs[name]
+            pages = status_pages(cfg, folder, name, index)
+            how = f"對應來自 {folder.relative_to(root)}/handoff-preflight.json"
+        else:
+            dirs = sorted({s.file.parent for s in index if GROUP_RE.match(s.title) and GROUP_RE.match(s.title).group(2) == name})
+            pages = pages_for(name, index, dirs, [])
+            how = "沒有 handoff-preflight.json，用群組 story 所在資料夾推"
+        group, e, w, n = status_issues(name, index, pages, root)
+        print(f"{'❌' if e else '✅'} {group or '?'} / {name}（{how}）")
+        for p in pages:
+            print(f"     · {p.title}：{p.tag or '沒有狀態標籤'}")
+        for x in n:
+            print("     " + x)
+        for x in w:
+            print("   [提醒] " + x)
+        for x in e:
+            print("   [錯誤] " + x)
+        total_errors += len(e)
+    print()
+    if total_errors:
+        print(f"❌ 狀態不一致：{total_errors} 項要修（改群組的人要同時改頁面標籤，只在 PM 說上線後才動）。")
+        return 1
+    print("✅ 所有需求的側欄群組與頁面狀態標籤一致。")
+    return 0
+
+
 def run_commands(cfg, root: Path, errors, notes):
     for c in cfg.get("commands", []):
         proc = subprocess.run(c["run"], shell=True, cwd=root / c.get("cwd", "."), capture_output=True, text=True)
@@ -295,6 +470,8 @@ def run_commands(cfg, root: Path, errors, notes):
 
 
 def main() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "--status-all":
+        return status_all(Path(sys.argv[2] if len(sys.argv) > 2 else "."), *sys.argv[3:4])
     if len(sys.argv) != 2:
         print(__doc__)
         return 2
@@ -319,6 +496,7 @@ def main() -> int:
     check_refs(cfg, folder, doc_files, errors, warnings, notes)
     check_overall(cfg, folder, errors, notes)
     check_tracking_notes(cfg, folder, root, errors, notes)
+    check_status(cfg, folder, root, errors, warnings, notes)
     run_commands(cfg, root, errors, notes)
 
     print(f"交付前檢查：{cfg.get('name', folder.name)}\n")

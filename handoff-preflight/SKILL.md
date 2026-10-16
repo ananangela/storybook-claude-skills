@@ -1,6 +1,6 @@
 ---
 name: handoff-preflight
-description: 交付前檢查（handoff preflight）：推任何交付資料夾（PRD／FLOW_SPEC／UI_SPEC／DATA_SPEC／PRODUCTION_HANDOFF／ACCEPTANCE／IMPLEMENTATION_GUIDE ＋ Storybook 原型）到雲端之前一律先跑，未通過不得推。抓五類交付後才會被工程發現的問題：原型文案沒寫進文件、被取代的舊規則還留在程式或文件、畫面的失敗／空狀態／權限／排序／更新時機沒回答、「第 N 條」指到不存在或已取代的定案、交付版本紀錄落後。觸發詞：交付、推上去、交接、handoff、給工程、改了定案、取代、新功能交付資料夾。
+description: 交付前檢查（handoff preflight）：推任何交付資料夾（PRD／FLOW_SPEC／UI_SPEC／DATA_SPEC／PRODUCTION_HANDOFF／ACCEPTANCE／IMPLEMENTATION_GUIDE ＋ Storybook 原型）到雲端之前一律先跑，未通過不得推。抓交付後才會被工程發現的問題：原型文案沒寫進文件、被取代的舊規則還留在程式或文件、畫面的失敗／空狀態／權限／排序／更新時機沒回答、「第 N 條」指到不存在或已取代的定案、交付版本紀錄落後、沒登記進 Overall、便利貼快照過期、側欄狀態群組（設計中／開發中／已上線）與 Pages 頁的 status-* 標籤不一致。觸發詞：交付、推上去、交接、handoff、給工程、改了定案、取代、新功能交付資料夾、改狀態群組、上線、status-live。
 ---
 
 # 交付前檢查（handoff-preflight）
@@ -94,3 +94,49 @@ python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py <交付資料夾
 - `handoff-preflight.json` 加 `"trackingNotes": { "match": ["<需求名>", "^Pages/(頁名|頁名)"], "output": "docs/TRACKING_NOTES.md" }`；`match` 是比對便利貼檔 `story.title` 的正則。
 - 檢查器跑 `node app/scripts/export-tracking-notes.mjs <交付資料夾> --check`，快照缺或過期就不通過；修法＝不帶 `--check` 跑一次重產。封存腳本會自動重產。
 - 腳本複本在 `storybook-tracking-notes` skill 的 `scripts/`；路徑不同用 `trackingNotes.script` 指定（相對 repoRoot）。
+
+## 第八類：側欄狀態群組與頁面狀態標籤一致（2026-10-16 起）
+
+側欄依狀態分組：需求資料夾的 story title 以「設計中/」「開發中/」「已上線/」開頭（例如 `已上線/2026-09_好友功能/導覽`）。畫面本體只有一份、放在 Pages，每個 Pages story 用 tags 標狀態：`status-designing`（設計中）、`status-delivered`（已交付工程・實作中）、`status-live`（已上線），左上角會顯示標籤（`app/src/storybook/PageStatusBadge.tsx`）。2026-10-16 發生過群組已改成「已上線」、八頁標籤還是 `status-delivered` 的事，所以加這一關。
+
+**工作規則**：改狀態群組的人要同時改那個需求所有頁面的 tag，而且只在 PM 說上線後才動。
+
+檢查器做的事：
+
+1. 找出這個需求（`deliveryName`）在側欄的群組。同一個需求出現在兩個群組 → `[錯誤]`。
+2. 找出它「所屬的頁」，再逐頁比對 tag：
+   - 群組「已上線」但任一頁不是 `status-live`（含沒有標籤）→ `[錯誤]`，印出該頁要改成 `tags: ["status-live"]`。
+   - 群組「設計中」或「開發中」但有頁是 `status-live` → `[錯誤]`，印出該頁要改回什麼；若 PM 已說上線，是群組該改「已上線」（兩邊同一次改）。
+   - 其他落差（例如「開發中」但頁是 `status-designing`）→ `[提醒]`。
+3. 一頁都找不到（畫面還沒進 Pages）→ 只確認群組、寫在 notes 裡。
+
+**需求資料夾對應哪些頁**（三個來源取聯集，照順序優先）：
+
+| 來源 | 怎麼算 | 什麼時候需要寫 |
+|---|---|---|
+| 群組 story 自己 | title 在這個需求底下、而且 meta 帶 status-* tag 的 story（刪除帳號就是這樣：畫面與群組同一則 story） | 不用寫 |
+| `codeDirs` | 這些資料夾（相對交付資料夾）底下所有 title 以 `Pages/` 開頭的 story（好友功能八頁就是這樣推出來的） | 既有欄位，不用另外寫 |
+| `status.pages` | 明確列 Pages 標題，例如 `["Pages/個人頁", "Pages/好友頁"]` | 頁面不在 codeDirs 底下、或要排除 codeDirs 裡不屬於這個需求的頁時 |
+
+可選設定（放在 `handoff-preflight.json`）：
+
+```json
+"deliveryName": "2026-09_好友功能",
+"status": {
+  "pages": ["Pages/某頁"],
+  "pageDirs": ["../某資料夾"],
+  "storiesDir": "app/src"
+}
+```
+
+- `deliveryName` 必填（已有），要跟側欄群組底下的需求資料夾名完全相同。
+- `status.pageDirs` 給了就取代 `codeDirs` 當掃描範圍；`storiesDir` 是相對 repoRoot 的 Storybook 原始碼位置（預設 `app/src`）。
+- 判定的是 meta 層的 `tags`；story 層的 tags 不算。
+
+**一次看整個倉庫**（不用交付資料夾，沒有 handoff-preflight.json 的需求也會比對，用群組 story 所在資料夾底下的 Pages story 推）：
+
+```bash
+python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py --status-all <倉庫根目錄>
+```
+
+每個需求印一行 ✅／❌、底下列它所屬的頁與目前的 tag；有任何 `[錯誤]` exit code 為 1。改了任何需求的狀態群組之後都跑一次。
