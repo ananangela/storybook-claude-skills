@@ -13,7 +13,7 @@ description: 交付前檢查（handoff preflight）：推任何交付資料夾�
 - 改了任何定案、文案、原型行為之後，在 commit 之前。
 
 ```bash
-python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py <交付資料夾>
+python3 .claude/skills/handoff-preflight/scripts/preflight.py <交付資料夾>
 ```
 
 輸出 `[錯誤]` 必修；`[提醒]` 看過確認即可。exit code 0 才算通過。
@@ -58,9 +58,9 @@ python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py <交付資料夾
   },
   "decisions": { "doc": "docs/PRODUCTION_HANDOFF.md", "heading": "Decisions", "openHeading": "Open Product Decisions" },
   "commands": [
-    { "name": "交付文件五條規則", "run": "python3 ~/.claude/skills/deliverable-doc-rules/scripts/check_doc.py <七份文件路徑>" },
-    { "name": "原型資料夾契約", "run": "python3 ~/.claude/skills/storybook-product-prototype/scripts/validate_prototype.py <交付資料夾>" },
-    { "name": "交付版本紀錄沒有落後", "run": "python3 ~/.claude/skills/storybook-product-prototype/scripts/validate_prototype.py <交付資料夾> --verify-manifest", "hint": "改過文件後重跑 --handoff-ready --changelog" },
+    { "name": "交付文件五條規則", "run": "python3 .claude/skills/deliverable-doc-rules/scripts/check_doc.py <七份文件路徑>" },
+    { "name": "原型資料夾契約", "run": "python3 .claude/skills/storybook-product-prototype/scripts/validate_prototype.py <交付資料夾>" },
+    { "name": "交付版本紀錄沒有落後", "run": "python3 .claude/skills/storybook-product-prototype/scripts/validate_prototype.py <交付資料夾> --verify-manifest", "hint": "改過文件後重跑 --handoff-ready --changelog" },
     { "name": "型別檢查", "run": "npx tsc --noEmit", "cwd": "app" }
   ]
 }
@@ -136,7 +136,7 @@ python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py <交付資料夾
 **一次看整個倉庫**（不用交付資料夾，沒有 handoff-preflight.json 的需求也會比對，用群組 story 所在資料夾底下的 Pages story 推）：
 
 ```bash
-python3 ~/.claude/skills/handoff-preflight/scripts/preflight.py --status-all <倉庫根目錄>
+python3 .claude/skills/handoff-preflight/scripts/preflight.py --status-all <倉庫根目錄>
 ```
 
 每個需求印一行 ✅／❌、底下列它所屬的頁與目前的 tag；有任何 `[錯誤]` exit code 為 1。改了任何需求的狀態群組之後都跑一次。

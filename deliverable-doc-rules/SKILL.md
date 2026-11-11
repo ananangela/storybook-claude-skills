@@ -59,7 +59,7 @@ description: 交付文件（裁決／決議紀錄、交接文件、規格、進�
 2. 寫完後執行檢查器：
 
 ```bash
-python3 ~/.claude/skills/deliverable-doc-rules/scripts/check_doc.py <檔案或資料夾…>
+python3 .claude/skills/deliverable-doc-rules/scripts/check_doc.py <檔案或資料夾…>
 ```
 
    支援 `.md`、`.html`、`.txt`、`.tsx`（只掃字串字面值）。加 `--json` 輸出機器可讀結果。

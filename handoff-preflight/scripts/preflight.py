@@ -458,9 +458,18 @@ def status_all(root: Path, stories_rel: str = "app/src") -> int:
     return 0
 
 
+def resolve_skill_paths(cmd: str, root: Path) -> str:
+    """檢查指令裡的 skill 路徑：倉庫 .claude/skills/<name>/ 有就用它；舊寫法 ~/.claude/skills/<name>/ 也轉過來。"""
+    def repl(m):
+        local = root / ".claude" / "skills" / m.group(1)
+        return str(local) + "/" if local.is_dir() else m.group(0)
+    return re.sub(r"(?:~/)?\.claude/skills/([A-Za-z0-9_-]+)/", repl, cmd)
+
+
 def run_commands(cfg, root: Path, errors, notes):
     for c in cfg.get("commands", []):
-        proc = subprocess.run(c["run"], shell=True, cwd=root / c.get("cwd", "."), capture_output=True, text=True)
+        cmd = resolve_skill_paths(c["run"], root)
+        proc = subprocess.run(cmd, shell=True, cwd=root / c.get("cwd", "."), capture_output=True, text=True)
         tail = (proc.stdout + proc.stderr).strip().splitlines()[-3:]
         if proc.returncode != 0:
             hint = f"（{c['hint']}）" if c.get("hint") else ""
