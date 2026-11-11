@@ -5,7 +5,7 @@
 
 ## 事件的定義以 PM 的埋點表為準
 
-這裡**只是挑選用的副本**，不是事件定義。計算條件、完整參數、上線版本都以 PM 維護的《發票載具 APP 埋點表》為準；兩邊不一致時改這裡，不要改埋點表。
+這裡**只是挑選用的副本**，不是事件定義。計算條件、完整參數、上線版本都以 PM 維護的埋點表為準；兩邊不一致時改這裡，不要改埋點表。
 
 ## 從 PM 的埋點表更新
 
@@ -24,7 +24,7 @@ node scripts/import-tracking-events.mjs ~/Downloads/埋點表.csv
 
 ## 命名規則（新埋點照這個取名）
 
-依 PM 提供的《Firebase 事件命名規則》（HackMD，2026-09-24 提供；原文是股市籌碼 K 線的規範，發票載具沿用同一套，既有的 `SWG_InvitePopup_showed` 就是這個格式）：
+依 PM 提供的《Firebase 事件命名規則》（既有的 `SWG_InvitePopup_showed` 就是這個格式）：
 
 ```
 前綴_名稱_動作      例：SWG_InvitePopup_showed、Toolkit_WidgetSocial_clicked
@@ -38,15 +38,15 @@ node scripts/import-tracking-events.mjs ~/Downloads/埋點表.csv
 
 - 頁面縮寫不可與現有的重複；新功能的縮寫先查 `invoice-manager.json` 裡已有的前綴。
 - 善用縮寫縮短長度（`Btn`、`Acct`、`Pwd`、`Intro`）。
-- 完整規範與該 App 的頁面縮寫表：（PM 提供的命名規範文件，連結放在專案自己的 tracking-events/README.md）
-- PM 的埋點表（需登入）：https://docs.google.com/spreadsheets/d/<SHEET_ID> — 相關工作表：「埋點表」「新埋點」「活動埋點」「已刪除埋點」。
+- 完整規範與該 App 的頁面縮寫表：見 PM 提供的命名規範文件（連結寫在專案自己的 `tracking-events/README.md`，不放在本範例）。
+- PM 的埋點表（需登入）：`https://docs.google.com/spreadsheets/d/<SHEET_ID>` — 把要匯入的工作表名稱也記在這裡。
 
 ## 從瀏覽器直接抓（不用下載 CSV）
 
 埋點表要登入才看得到，但登入後可以用「內嵌 HTML 表格」的網址開它，不會觸發下載：
 
 ```
-https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:html&sheet=埋點表
+https://docs.google.com/spreadsheets/d/<SHEET_ID>/gviz/tq?tqx=out:html&sheet=<工作表名稱>
 ```
 
 在那一頁的開發者工具主控台執行下面這段，就會把表格整理成 TSV 複製到剪貼簿；貼到 `imports/<日期>-tracking-sheet.tsv` 後跑上面的匯入指令即可（`.tsv` 也吃）。
@@ -61,6 +61,6 @@ await navigator.clipboard.writeText(out.join('\n'));
 
 ## 目前內容
 
-- 2026-09-24：從 PM 的《發票載具APP公用表單 › 埋點表》整表匯入（見 `imports/2026-09-24-tracking-sheet.tsv`），依「頁面名稱」分模組。
+- 2026-09-24：從 PM 的埋點表整表匯入（見 `imports/2026-09-24-tracking-sheet.tsv`），依「頁面名稱」分模組。
 - 碼上有你（前綴 `SWG`）31 個事件不在埋點表裡，仍是 2026-09-16 讀 iOS／Android 程式碼整理的清單；PM 補進埋點表後重跑匯入會以表為準。
-- 「新埋點」「活動埋點」兩張工作表的內容都已包含在埋點表裡，不另外匯入。
+- 其他工作表（新埋點、活動埋點）的內容都已包含在主表裡，不另外匯入。
